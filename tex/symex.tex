@@ -1,0 +1,148 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{mathpartir}
+\usepackage{geometry}
+\usepackage{syntax}
+\usepackage{amsmath}
+\usepackage{centernot}
+% -- Semantics stuff
+%     I defined a couple of special commands (see examples in the text below) to make
+%     writing inference rules and judgements easier.
+\newcommand{\br}[1]{\langle #1 \rangle}
+
+\def\Yields{\Downarrow}
+\def\Dom{\textrm{dom }}
+\def\Ptr{\textrm{ptr }}
+
+\title{GPTValidationOpsem}
+\author{Jasper Geer}
+\date{March 2023}
+\begin{document}
+%% \rho(S) notation from mixing TC paper
+
+\section{Source Language}
+\begin{grammar}
+<statement> ::= <statement> <statement>
+  \alt `if' (<expression>) \{ <statement> \} `else' \{ <statement> \}
+  \alt `return' <expression> `;'
+  \alt <expression> `;'
+
+<expression> ::= <variable> | <literal>
+  \alt (<expression>)
+  \alt <expression> <binop> <expression>
+  \alt <unop> <expression>
+
+<binop> ::= `+' | `-' | `*' | `/' | `%'
+  \alt `&&' | `||'
+  \alt `&' | `|' | `<<' | `>>'
+  \alt `==' | `<=' | `>=' | `<' | `>'
+\end{grammar}
+
+\section{Symbolic Execution}
+
+\subsection{Expressions}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{Literal}]
+  { }
+  {\langle S;v \rangle\Yields\langle S;v \rangle}
+\end{mathpar}
+
+\subsection{Statements}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{Expression}]
+  {\langle S;e \rangle\Yields\langle S';s \rangle}
+  {\langle S;\textbf{$e$ ;} \rangle\Yields\langle S';\emptyset\rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{Sequence}]
+  {\langle S;c_1 \rangle\Yields\langle S_1;s_1 \rangle \\
+  \langle S_1;c_2 \rangle\Yields\langle S_2;s_2 \rangle}
+  {\langle S; \texttt{\textbf{$c_1$ $c_2$}}\rangle\Yields\langle S_2;s_2 \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{IfElse}]
+  {\langle S;e \rangle\Yields\langle S_1;g_1 \rangle \\
+    g(S)\centernot\implies g_1 \\
+    g(S)\centernot\implies \neg g_1 \\\\
+    \langle S_1[g\mapsto g(S_1)\land g_1];c_1 \rangle\Yields\langle S_2;s_2 \rangle \\\\
+    \langle S_1[g\mapsto g(S_1)\land\neg g_1];c_1 \rangle\Yields\langle S_3;s_3 \rangle \\\\
+    S'=\langle (g_1\textrm{?}g(S_2)\textrm{:}g(S_3));(g_1\textrm{?}\rho(S_2)\textrm{:}\rho(S_3));(g_1\textrm{?}\mu(S_2)\textrm{:}\mu(S_3))}
+  {\langle S;\textbf{if $e$ \{ $c_1$ \} else \{ $c_2$ \}} \rangle\Yields\langle S';\emptyset \rangle}
+\end{mathpar}
+
+%% these two may be unnecessary
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{IfTrue}]
+  {\langle S;e \rangle\Yields\langle S_1;g_1 \rangle \\
+    g(S)\implies g_1 \\
+    \langle S_1;c_1 \rangle\Yields\langle S_2;s \rangle}
+  {\langle S;\textbf{if $e$ \{ $c_1$ \} else \{ $c_2$ \}} \rangle\Yields\langle S_2;\emptyset \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{IfFalse}]
+  {\langle S;e \rangle\Yields\langle S_1;g_1 \rangle \\
+    g(S)\implies \neg g_1 \\
+    \langle S_1;c_2 \rangle\Yields\langle S_2;s \rangle}
+  {\langle S;\textbf{if $e$ \{ $c_1$ \} else \{ $c_2$ \}} \rangle\Yields\langle S_2;\emptyset \rangle}
+\end{mathpar}
+
+\subsection{Memory}
+
+%% arrays todo
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{Var}]
+  {\rho(S)[x]=s}
+  {\langle S;x \rangle\Yields\langle S;s \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{DeclareLocal}]
+  {x\not\in \Dom\rho(S)}
+  {\langle S; \texttt{\textbf{$\tau$ $x$}}\rangle\Yields\langle S[\rho\mapsto (\rho(S), (x\rightarrow\emptyset)];s \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{DeclareAssignLocal}]
+  {x\not\in \Dom\rho(S) \\
+  \langle S;e \rangle\Yields\langle S';s \rangle}
+  {\langle S; \texttt{\textbf{$\tau$ $x$ = $e$}}\rangle\Yields\langle S'[\rho\mapsto (\rho(S'), (x\rightarrow s)];s \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{UpdLocal}]
+  {\langle S;e_1 \rangle\Yields\langle S_1;\Ptr x \rangle \\ 
+  x\in \Dom\rho(S_1) \\
+  \langle S_1;e_2 \rangle\Yields\langle S_2;s \rangle}
+  {\langle S; \texttt{\textbf{*$e_1$ = $e_2$}}\rangle\Yields\langle S_2[\rho\mapsto (\rho(S_2), (x\rightarrow s)];s \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{UpdGlobal}]
+  {\langle S;e_1 \rangle\Yields\langle S_1;s_1 \rangle \\ 
+  s_1\not= \Ptr x\\
+  \langle S_1;e_2 \rangle\Yields\langle S_2;s_2 \rangle}
+  {\langle S; \texttt{\textbf{*$e_1$ = $e_2$}}\rangle\Yields\langle S_2[\mu\mapsto (\mu(S_2), (s_1\rightarrow s_2)];s_2 \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{SelLocal}]
+  {\langle S;e \rangle\Yields\langle S';\Ptr x \rangle \\
+  \rho(S')[x]=s}
+  {\langle S; \texttt{\textbf{*$e$}}\rangle\Yields\langle S';s \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{SelGlobal}]
+  {\langle S;e \rangle\Yields\langle S';\Ptr x \rangle \\
+    \rho(S')[x]=s}
+  {\langle S; \texttt{\textbf{*$e$}}\rangle\Yields\langle S';s \rangle}
+\end{mathpar}
+
+\end{document}
