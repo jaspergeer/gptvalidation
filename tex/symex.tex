@@ -5,7 +5,7 @@
 \usepackage{syntax}
 \usepackage{amsmath}
 \usepackage{centernot}
-% -- Semantics stuff
+% -- Semantics stuff  
 %     I defined a couple of special commands (see examples in the text below) to make
 %     writing inference rules and judgements easier.
 \newcommand{\br}[1]{\langle #1 \rangle}
@@ -22,20 +22,39 @@
 
 \section{Source Language}
 \begin{grammar}
-<statement> ::= <statement> <statement>
-  \alt `if' (<expression>) \{ <statement> \} `else' \{ <statement> \}
+<statement> ::= <compound-statement>
+  \alt `if' (<expression>) <compound-statement> `else' <compound-statement>
+  \alt `while' (<expression>) <compound-statement>
+  \alt `for' (<statement> `;' <statement> `;' <statement>) <compound-statement>
+  \alt <qualifier> <type> <name> `;'
+  \alt <qualifier> <type> <name> `=' <expression> `;'
   \alt `return' <expression> `;'
   \alt <expression> `;'
 
-<expression> ::= <variable> | <literal>
+<compound-statement> ::= `{' <statement>* `}'
+
+<expression> ::= <name> | <literal>
   \alt (<expression>)
   \alt <expression> <binop> <expression>
   \alt <unop> <expression>
+  \alt <name> (<parameter-list>)
+  \alt `&' <name>
+  \alt <expression> `++'
+  \alt <expression> `--'
+
+<parameter-list> ::= <qualifier> <type> <name> `,' <parameter-list>
+  \alt <type-qualifier> <type> <name>
 
 <binop> ::= `+' | `-' | `*' | `/' | `%'
   \alt `&&' | `||'
   \alt `&' | `|' | `<<' | `>>'
   \alt `==' | `<=' | `>=' | `<' | `>'
+
+<unop> ::= `-' | `!' | `~' | `*' | `++' | `--'
+
+<type-qualifier> ::= `const' | `volatile'
+
+<type> ::= <type-qualifier> <type-specifier>
 \end{grammar}
 
 \section{Symbolic Execution}
@@ -53,14 +72,13 @@
 \begin{mathpar}
   \inferrule*[Right=\textsc{Expression}]
   {\langle S;e \rangle\Yields\langle S';s \rangle}
-  {\langle S;\textbf{$e$ ;} \rangle\Yields\langle S';\emptyset\rangle}
+  {\langle S;\textbf{$e$;} \rangle\Yields\langle S';\emptyset\rangle}
 \end{mathpar}
 
 \begin{mathpar}
-  \inferrule*[Right=\textsc{Sequence}]
-  {\langle S;c_1 \rangle\Yields\langle S_1;s_1 \rangle \\
-  \langle S_1;c_2 \rangle\Yields\langle S_2;s_2 \rangle}
-  {\langle S; \texttt{\textbf{$c_1$ $c_2$}}\rangle\Yields\langle S_2;s_2 \rangle}
+  \inferrule*[Right=\textsc{CompoundStatement}]
+  {\forall i\in1..n, \langle S_i;c_i \rangle\Yields\langle S_{i+1};s_{i+1} \rangle}
+  {\langle S_1; \textbf{\{$c_1..c_n$\}}\rangle\Yields\langle S_{n+1};s_{n+1} \rangle}
 \end{mathpar}
 
 \begin{mathpar}
@@ -71,7 +89,7 @@
     \langle S_1[g\mapsto g(S_1)\land g_1];c_1 \rangle\Yields\langle S_2;s_2 \rangle \\\\
     \langle S_1[g\mapsto g(S_1)\land\neg g_1];c_1 \rangle\Yields\langle S_3;s_3 \rangle \\\\
     S'=\langle (g_1\textrm{?}g(S_2)\textrm{:}g(S_3));(g_1\textrm{?}\rho(S_2)\textrm{:}\rho(S_3));(g_1\textrm{?}\mu(S_2)\textrm{:}\mu(S_3))}
-  {\langle S;\textbf{if $e$ \{ $c_1$ \} else \{ $c_2$ \}} \rangle\Yields\langle S';\emptyset \rangle}
+  {\langle S;\textbf{if $e$ $c_1$ else $c_2$} \rangle\Yields\langle S';\emptyset \rangle}
 \end{mathpar}
 
 %% these two may be unnecessary
@@ -81,7 +99,7 @@
   {\langle S;e \rangle\Yields\langle S_1;g_1 \rangle \\
     g(S)\implies g_1 \\
     \langle S_1;c_1 \rangle\Yields\langle S_2;s \rangle}
-  {\langle S;\textbf{if $e$ \{ $c_1$ \} else \{ $c_2$ \}} \rangle\Yields\langle S_2;\emptyset \rangle}
+  {\langle S;\textbf{if $e$ $c_1$ else $c_2$ } \rangle\Yields\langle S_2;\emptyset \rangle}
 \end{mathpar}
 
 \begin{mathpar}
@@ -89,7 +107,7 @@
   {\langle S;e \rangle\Yields\langle S_1;g_1 \rangle \\
     g(S)\implies \neg g_1 \\
     \langle S_1;c_2 \rangle\Yields\langle S_2;s \rangle}
-  {\langle S;\textbf{if $e$ \{ $c_1$ \} else \{ $c_2$ \}} \rangle\Yields\langle S_2;\emptyset \rangle}
+  {\langle S;\textbf{if $e$ $c_1$ else $c_2$} \rangle\Yields\langle S_2;\emptyset \rangle}
 \end{mathpar}
 
 \subsection{Memory}
@@ -105,14 +123,14 @@
 \begin{mathpar}
   \inferrule*[Right=\textsc{DeclareLocal}]
   {x\not\in \Dom\rho(S)}
-  {\langle S; \texttt{\textbf{$\tau$ $x$}}\rangle\Yields\langle S[\rho\mapsto (\rho(S), (x\rightarrow\emptyset)];s \rangle}
+  {\langle S; \texttt{\textbf{$\tau$ $x$;}}\rangle\Yields\langle S[\rho\mapsto (\rho(S), (x\rightarrow\emptyset)];s \rangle}
 \end{mathpar}
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{DeclareAssignLocal}]
   {x\not\in \Dom\rho(S) \\
   \langle S;e \rangle\Yields\langle S';s \rangle}
-  {\langle S; \texttt{\textbf{$\tau$ $x$ = $e$}}\rangle\Yields\langle S'[\rho\mapsto (\rho(S'), (x\rightarrow s)];s \rangle}
+  {\langle S; \texttt{\textbf{$\tau$ $x$ = $e$;}}\rangle\Yields\langle S'[\rho\mapsto (\rho(S'), (x\rightarrow s)];s \rangle}
 \end{mathpar}
 
 \begin{mathpar}
