@@ -21,6 +21,7 @@ executable gptvalidation
     -- other-modules:
     -- other-extensions:
     build-depends:    base ^>=4.17.0.0,
-                      z3
+                      z3,
+                      parsec
     hs-source-dirs:   app
     default-language: Haskell2010

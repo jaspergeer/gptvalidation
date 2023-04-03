@@ -23,41 +23,102 @@
 \section{Source Language}
 \begin{grammar}
 <statement> ::= <compound-statement>
-  \alt `if' (<expression>) <compound-statement> `else' <compound-statement>
-  \alt `while' (<expression>) <compound-statement>
-  \alt `for' (<statement> `;' <statement> `;' <statement>) <compound-statement>
-  \alt <qualifier> <type> <name> `;'
-  \alt <qualifier> <type> <name> `=' <expression> `;'
-  \alt `return' <expression> `;'
-  \alt <expression> `;'
+  \alt "if (" <expression> ")" <compound-statement> "else" <compound-statement>
+  \alt "while (" <expression> ")" <compound-statement>
+  \alt "for (" <statement> ";" <statement> ";" <statement> ")" <compound-statement>
+  \alt <qualifier> <type> <name> ";"
+  \alt <qualifier> <type> <name> "=" <expression> ";"
+  \alt "return" <expression> ";"
+  \alt <expression> ";"
 
-<compound-statement> ::= `{' <statement>* `}'
+<compound-statement> ::= "{" <statement>* "}"
 
-<expression> ::= <name> | <literal>
-  \alt (<expression>)
-  \alt <expression> <binop> <expression>
-  \alt <unop> <expression>
-  \alt <name> (<parameter-list>)
-  \alt `&' <name>
-  \alt <expression> `++'
-  \alt <expression> `--'
+<primary-expression> ::= <identifier>
+  \alt <constant>
+  \alt <string-literal>
+  \alt "(" <expression> ")"
 
-<parameter-list> ::= <qualifier> <type> <name> `,' <parameter-list>
+<postfix-expression> ::= <primary-expression>
+  \alt <postfix-expression> "[" <expression> "]"
+  \alt <name> "(" <argument-list> ")"
+  \alt <name> "++"
+  \alt <name> "--"
+
+<unary-expression> ::= <postfix-expression>
+  \alt "++" <name>
+  \alt "--" <name>
+  \alt "&" <name>
+  \alt <unary-operator> <cast-expression>
+
+<multiplicative-expression> ::= <unary-expression>
+  \alt <multiplicative-expression> "*" <unary-expression>
+  \alt <multiplicative-expression> "/" <unary-expression>
+  \alt <multiplicative-expression> "\%" <unary-expression>
+
+<additive-expression> ::= <multiplicative-expression>
+  \alt <additive-expression> "+" <multiplicative-expression>
+  \alt <additive-expression> "-" <multiplicative-expression>
+
+<shift-expression> ::= <additive-expression>
+  \alt <shift-expression> "<<" <additive-expression>
+  \alt <shift-expression> ">>" <additive-expression>
+  
+<relational-expression> ::= <shift-expression>
+  \alt <relational-expression> "<" <shift-expression>
+  \alt <relational-expression> ">" <shift-expression>
+  \alt <relational-expression> "<=" <shift-expression>
+  \alt <relational-expression> ">=" <shift-expression>
+
+<equality-expression> ::= <relational-expression>
+  \alt <equality-expression> "==" <relational-expression>
+  \alt <equality-expression> "!=" <relational-expression>
+
+<bitwise-and-expression> ::= <equality-expression>
+  \alt <and-expression> "&" <equality-expression>
+
+<exclusive-or-expression> ::= <and-expression>
+  \alt <exclusive-or-expression> "|" <exclusive-or-expression>
+
+<bitwise-or-expression> ::= <exclusive-or-expression>
+  \alt <inclusive-or-expression> "|" <exclusive-or-expression>
+
+<logical-and-expression> ::= <bitwise-or-expression>
+  \alt <logical-and-expression> "&&" <bitwise-or-expression>
+
+<logical-or-expression> ::= <logical-and-expression>
+  \alt <logical-or-expression> "||" <logical-and-expression>
+
+<conditional-expression> ::= <logical-or-expression>
+  \alt <conditional-expression> "?" <expression> ":" <conditional-expression>
+
+<assignment-expression> ::= <conditional-expression>
+  \alt <unary-expression> <assignment-operator> <assignment-expression>
+
+<expression> ::= <assignment-expression>
+
+<parameter-list> ::= <qualifier> <type> <name> "," <argument-list>
   \alt <type-qualifier> <type> <name>
 
-<binop> ::= `+' | `-' | `*' | `/' | `%'
-  \alt `&&' | `||'
-  \alt `&' | `|' | `<<' | `>>'
-  \alt `==' | `<=' | `>=' | `<' | `>'
+<argument-list> ::= <expression> "," <argument-list>
+  \alt <expression>
 
-<unop> ::= `-' | `!' | `~' | `*' | `++' | `--'
+<assignment-operator> ::= "=" | "*=" | "/=" | "\%=" | "+=" | "-="
 
-<type-qualifier> ::= `const' | `volatile'
+<unary-operator> ::= "*" | "-" | "!" | "~"
+
+<type-qualifier> ::= "const" | "volatile"
+
+<type-specifier> ::= "int" | "char" | "float"
 
 <type> ::= <type-qualifier> <type-specifier>
+
+<function-definition> ::= <type> <name> "(" <parameter-list> ")" <compound-expression>
+
 \end{grammar}
 
 \section{Symbolic Execution}
+
+$S=\langle g;\rho;\mu \rangle$
 
 \subsection{Expressions}
 
@@ -67,18 +128,43 @@
   {\langle S;v \rangle\Yields\langle S;v \rangle}
 \end{mathpar}
 
+\begin{mathpar}
+  \inferrule*[Right=\textsc{Negate}]
+  {\langle S; e \rangle\Yields S';s \rangle}
+  {\langle S; \texttt{-$e$} \rangle\Yields\langle S';-s \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{Add}]
+  {\langle S; e_1 \rangle\Yields S_1;s_1 \rangle \\
+    \langle S_1; e_2 \rangle\Yields S_2;s_2 \rangle}
+  {\langle S; \texttt{$e_1$ + $e_2$} \rangle\Yields\langle S_2;e_1+e_2 \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{AssignAdd}]
+  {\langle S; \texttt{$e_1$ = $e_1$ + $e_2$} \rangle\Yields S';s \rangle}
+  {\langle S; \texttt{$e_1$ += $e_2$} \rangle\Yields\langle S';s \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{FunCall}]
+  {\forall i\in 1..n, \langle S_i;e_i \rangle\Yields\langle S_{i+1};s_{i}\rangle}
+  {\langle S_1; \texttt{x($e_1$,..,$e_n$)} \rangle\Yields\langle S_{n+1};x(s_1,..,s_n) \rangle}
+\end{mathpar}
+
 \subsection{Statements}
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{Expression}]
   {\langle S;e \rangle\Yields\langle S';s \rangle}
-  {\langle S;\textbf{$e$;} \rangle\Yields\langle S';\emptyset\rangle}
+  {\langle S;\texttt{$e$;} \rangle\Yields\langle S';\emptyset\rangle}
 \end{mathpar}
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{CompoundStatement}]
   {\forall i\in1..n, \langle S_i;c_i \rangle\Yields\langle S_{i+1};s_{i+1} \rangle}
-  {\langle S_1; \textbf{\{$c_1..c_n$\}}\rangle\Yields\langle S_{n+1};s_{n+1} \rangle}
+  {\langle S_1; \texttt{\{$c_1..c_n$\}}\rangle\Yields\langle S_{n+1};s_{n+1} \rangle}
 \end{mathpar}
 
 \begin{mathpar}
@@ -89,7 +175,7 @@
     \langle S_1[g\mapsto g(S_1)\land g_1];c_1 \rangle\Yields\langle S_2;s_2 \rangle \\\\
     \langle S_1[g\mapsto g(S_1)\land\neg g_1];c_1 \rangle\Yields\langle S_3;s_3 \rangle \\\\
     S'=\langle (g_1\textrm{?}g(S_2)\textrm{:}g(S_3));(g_1\textrm{?}\rho(S_2)\textrm{:}\rho(S_3));(g_1\textrm{?}\mu(S_2)\textrm{:}\mu(S_3))}
-  {\langle S;\textbf{if $e$ $c_1$ else $c_2$} \rangle\Yields\langle S';\emptyset \rangle}
+  {\langle S;\texttt{if $e$ $c_1$ else $c_2$} \rangle\Yields\langle S';\emptyset \rangle}
 \end{mathpar}
 
 %% these two may be unnecessary
@@ -99,7 +185,7 @@
   {\langle S;e \rangle\Yields\langle S_1;g_1 \rangle \\
     g(S)\implies g_1 \\
     \langle S_1;c_1 \rangle\Yields\langle S_2;s \rangle}
-  {\langle S;\textbf{if $e$ $c_1$ else $c_2$ } \rangle\Yields\langle S_2;\emptyset \rangle}
+  {\langle S;\texttt{if $e$ $c_1$ else $c_2$ } \rangle\Yields\langle S_2;\emptyset \rangle}
 \end{mathpar}
 
 \begin{mathpar}
@@ -107,7 +193,7 @@
   {\langle S;e \rangle\Yields\langle S_1;g_1 \rangle \\
     g(S)\implies \neg g_1 \\
     \langle S_1;c_2 \rangle\Yields\langle S_2;s \rangle}
-  {\langle S;\textbf{if $e$ $c_1$ else $c_2$} \rangle\Yields\langle S_2;\emptyset \rangle}
+  {\langle S;\texttt{if $e$ $c_1$ else $c_2$} \rangle\Yields\langle S_2;\emptyset \rangle}
 \end{mathpar}
 
 \subsection{Memory}
@@ -123,14 +209,14 @@
 \begin{mathpar}
   \inferrule*[Right=\textsc{DeclareLocal}]
   {x\not\in \Dom\rho(S)}
-  {\langle S; \texttt{\textbf{$\tau$ $x$;}}\rangle\Yields\langle S[\rho\mapsto (\rho(S), (x\rightarrow\emptyset)];s \rangle}
+  {\langle S; \texttt{\texttt{$\tau$ $x$;}}\rangle\Yields\langle S[\rho\mapsto (\rho(S), (x\rightarrow\emptyset)];s \rangle}
 \end{mathpar}
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{DeclareAssignLocal}]
   {x\not\in \Dom\rho(S) \\
   \langle S;e \rangle\Yields\langle S';s \rangle}
-  {\langle S; \texttt{\textbf{$\tau$ $x$ = $e$;}}\rangle\Yields\langle S'[\rho\mapsto (\rho(S'), (x\rightarrow s)];s \rangle}
+  {\langle S; \texttt{\texttt{$\tau$ $x$ = $e$;}}\rangle\Yields\langle S'[\rho\mapsto (\rho(S'), (x\rightarrow s)];s \rangle}
 \end{mathpar}
 
 \begin{mathpar}
@@ -138,7 +224,7 @@
   {\langle S;e_1 \rangle\Yields\langle S_1;\Ptr x \rangle \\ 
   x\in \Dom\rho(S_1) \\
   \langle S_1;e_2 \rangle\Yields\langle S_2;s \rangle}
-  {\langle S; \texttt{\textbf{*$e_1$ = $e_2$}}\rangle\Yields\langle S_2[\rho\mapsto (\rho(S_2), (x\rightarrow s)];s \rangle}
+  {\langle S; \texttt{\texttt{*$e_1$ = $e_2$}}\rangle\Yields\langle S_2[\rho\mapsto (\rho(S_2), (x\rightarrow s)];s \rangle}
 \end{mathpar}
 
 \begin{mathpar}
@@ -146,21 +232,33 @@
   {\langle S;e_1 \rangle\Yields\langle S_1;s_1 \rangle \\ 
   s_1\not= \Ptr x\\
   \langle S_1;e_2 \rangle\Yields\langle S_2;s_2 \rangle}
-  {\langle S; \texttt{\textbf{*$e_1$ = $e_2$}}\rangle\Yields\langle S_2[\mu\mapsto (\mu(S_2), (s_1\rightarrow s_2)];s_2 \rangle}
+  {\langle S; \texttt{\texttt{*$e_1$ = $e_2$}}\rangle\Yields\langle S_2[\mu\mapsto (\mu(S_2), (s_1\rightarrow s_2)];s_2 \rangle}
 \end{mathpar}
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{SelLocal}]
   {\langle S;e \rangle\Yields\langle S';\Ptr x \rangle \\
   \rho(S')[x]=s}
-  {\langle S; \texttt{\textbf{*$e$}}\rangle\Yields\langle S';s \rangle}
+  {\langle S; \texttt{\texttt{*$e$}}\rangle\Yields\langle S';s \rangle}
 \end{mathpar}
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{SelGlobal}]
   {\langle S;e \rangle\Yields\langle S';\Ptr x \rangle \\
     \rho(S')[x]=s}
-  {\langle S; \texttt{\textbf{*$e$}}\rangle\Yields\langle S';s \rangle}
+  {\langle S; \texttt{\texttt{*$e$}}\rangle\Yields\langle S';s \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{IncPre}]
+  {\rho(S)[x]=s}
+  {\langle S; \texttt{++$x$} \rangle\Yields\langle S[\rho\mapsto(\rho(S),x\rightarrow s+1)];s+1 \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{IncPost}]
+  {\rho(S)[x]=s}
+  {\langle S; \texttt{$x$++} \rangle\Yields\langle S[\rho\mapsto(\rho(S),x\rightarrow s+1)];s \rangle}
 \end{mathpar}
 
 \end{document}

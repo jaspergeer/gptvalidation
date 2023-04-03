@@ -1,4 +1,4 @@
-module TVC where
+module Lang where
 
 data Binop = Add | Sub | Mul | Mod | Div -- arithmetic
            | LAnd | LOr -- boolean
@@ -7,8 +7,11 @@ data Binop = Add | Sub | Mul | Mod | Div -- arithmetic
 
 data Unop = Neg | LNot | BNot | Deref
 
+data AssignOp = Assign | MulAssign | DivAssign | ModAssign | AddAssign | SubAssign
+
 data Expr = BinExpr Expr Binop Expr
-          | UnopExpr Unop Expr
+          | UnExpr Unop Expr
+          | AssignExpr Expr AssignOp Expr
           | Var Name
           | FunCall Name [Expr]
           | Ref Name
