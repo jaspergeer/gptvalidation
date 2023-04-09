@@ -4,7 +4,13 @@
 \usepackage{geometry}
 \usepackage{syntax}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{centernot}
+
+
+\renewcommand{\syntleft}{}
+\renewcommand{\syntright}{}
+
 % -- Semantics stuff  
 %     I defined a couple of special commands (see examples in the text below) to make
 %     writing inference rules and judgements easier.
@@ -13,6 +19,13 @@
 \def\Yields{\Downarrow}
 \def\Dom{\textrm{dom }}
 \def\Ptr{\textrm{ptr }}
+\def\Sel{\textrm{sel}}
+\def\Upd{\textrm{upd}}
+\def\Max{\textrm{max}}
+
+\def\ArrTy{\textrm{Arr }}
+\def\PtrTy{\textrm{Ptr }}
+
 
 \title{GPTValidationOpsem}
 \author{Jasper Geer}
@@ -20,7 +33,8 @@
 \begin{document}
 %% \rho(S) notation from mixing TC paper
 
-\section{Source Language}
+\section{Representations}
+\subsection{Source Language}
 \begin{grammar}
 <statement> ::= <compound-statement>
   \alt "if (" <expression> ")" <compound-statement> "else" <compound-statement>
@@ -41,14 +55,14 @@
 <postfix-expression> ::= <primary-expression>
   \alt <postfix-expression> "[" <expression> "]"
   \alt <name> "(" <argument-list> ")"
-  \alt <name> "++"
-  \alt <name> "--"
+  \alt <postfix-expression> "++"
+  \alt <postfix-expression> "--"
 
 <unary-expression> ::= <postfix-expression>
-  \alt "++" <name>
-  \alt "--" <name>
-  \alt "&" <name>
-  \alt <unary-operator> <cast-expression>
+  \alt "++" <unary-expression>
+  \alt "--" <unary-expression>
+  % \alt "&" <unary-expression>
+  \alt <unary-operator> <postfix-expression>
 
 <multiplicative-expression> ::= <unary-expression>
   \alt <multiplicative-expression> "*" <unary-expression>
@@ -108,7 +122,7 @@
 
 <type-qualifier> ::= "const" | "volatile"
 
-<type-specifier> ::= "int" | "char" | "float"
+<type-specifier> ::= "int" | "unsigned" | "char" %| "float"
 
 <type> ::= <type-qualifier> <type-specifier>
 
@@ -118,39 +132,74 @@
 
 \section{Symbolic Execution}
 
-$S=\langle g;\rho;\mu \rangle$
+\subsection{Metavariables}
+$e$ - source language expressions\\
+$c$ - source language statements\\
+$s$ - symbolic expressions\\
+$x$ - names\\
+$v$ - symbolic values\\
+
+\subsection{Symbolic Expressions}
+
+$\tau$ - symbolic types\\
+$s$ - symbolic expressions\\
+$x, \alpha$ - symbolic variables\\
+$v$ - symbolic values\\
+
+\begin{grammar}
+
+<$s$> ::= $v$ | $x$
+  \alt $s$ binop $s$
+  \alt unop $s$
+  \alt $\Sel(s, s)$
+  \alt $\Upd(s, s, s)$
+  \alt $x(s,..,s)$
+  \alt $s?:s:s$
+  \alt $\emptyset$
+
+\end{grammar}
 
 \subsection{Expressions}
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{Literal}]
-  { }
+  {}
   {\langle S;v \rangle\Yields\langle S;v \rangle}
 \end{mathpar}
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{Negate}]
   {\langle S; e \rangle\Yields S';s \rangle}
-  {\langle S; \texttt{-$e$} \rangle\Yields\langle S';-s \rangle}
+  {\langle S; \texttt{-$e$} \rangle\Yields\langle S';-s:\tau(s) \rangle}
 \end{mathpar}
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{Add}]
   {\langle S; e_1 \rangle\Yields S_1;s_1 \rangle \\
-    \langle S_1; e_2 \rangle\Yields S_2;s_2 \rangle}
-  {\langle S; \texttt{$e_1$ + $e_2$} \rangle\Yields\langle S_2;e_1+e_2 \rangle}
+    \langle S_1; e_2 \rangle\Yields S_2;s_2 \rangle\\
+    \tau = \Max(\tau(s_1),\tau(s_2))}
+  {\langle S; \texttt{$e_1$ + $e_2$} \rangle\Yields\langle S_2;s_1+s_2:\tau \rangle}
 \end{mathpar}
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{AssignAdd}]
-  {\langle S; \texttt{$e_1$ = $e_1$ + $e_2$} \rangle\Yields S';s \rangle}
-  {\langle S; \texttt{$e_1$ += $e_2$} \rangle\Yields\langle S';s \rangle}
+  {\langle S; \texttt{$e_1$} \rangle\Yields\langle S_1;s_1) \rangle \\
+  s_1=\Sel(\mu(S_k,s_k)):\tau\\
+  \langle S_1; \texttt{$e_2$} \rangle\Yields\langle S_2;s_2 \rangle}
+  {\langle S; \texttt{$e_1$ += $e_2$} \rangle\Yields\langle S_2[\mu\mapsto\Upd(\mu(S_2),s_k,s_1 + s_2:\tau)];s_2 \rangle}
 \end{mathpar}
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{FunCall}]
-  {\forall i\in 1..n, \langle S_i;e_i \rangle\Yields\langle S_{i+1};s_{i}\rangle}
-  {\langle S_1; \texttt{x($e_1$,..,$e_n$)} \rangle\Yields\langle S_{n+1};x(s_1,..,s_n) \rangle}
+  {\rho(S_1)[x]=(\tau_1,..\tau_n)\rightarrow\tau\\
+  \forall i\in 1..n, \langle S_k;e_i \rangle\Yields\langle S_{i+1};s_{i}\rangle}
+  {\langle S_1; \texttt{$x$($e_1$,..,$e_n$)} \rangle\Yields\langle S_{n+1};x(s_1:\tau_1,..,s_n:\tau_n):\tau \rangle}
+\end{mathpar}
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{Cast}]
+  {\langle S;e \rangle\Yields\langle S';s \rangle}
+  {\langle S;\textrm{($\tau$) } e \rangle\Yields\langle S';s:\tau \rangle}
 \end{mathpar}
 
 \subsection{Statements}
@@ -158,13 +207,13 @@ $S=\langle g;\rho;\mu \rangle$
 \begin{mathpar}
   \inferrule*[Right=\textsc{Expression}]
   {\langle S;e \rangle\Yields\langle S';s \rangle}
-  {\langle S;\texttt{$e$;} \rangle\Yields\langle S';\emptyset\rangle}
+  {\langle S;\texttt{$e$;} \rangle\Yields\langle S';\emptyset:\textrm{u8}\rangle}
 \end{mathpar}
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{CompoundStatement}]
-  {\forall i\in1..n, \langle S_i;c_i \rangle\Yields\langle S_{i+1};s_{i+1} \rangle}
-  {\langle S_1; \texttt{\{$c_1..c_n$\}}\rangle\Yields\langle S_{n+1};s_{n+1} \rangle}
+  {\forall i\in1..n, \langle S_k;c_i \rangle\Yields\langle S_{i+1};s_{i+1} \rangle}
+  {\langle S_1; \texttt{\{$c_1..c_n$\}}\rangle\Yields\langle S_{n+1}[\rho\mapsto\rho(S_1)];s_{n+1} \rangle}
 \end{mathpar}
 
 \begin{mathpar}
@@ -175,26 +224,26 @@ $S=\langle g;\rho;\mu \rangle$
     \langle S_1[g\mapsto g(S_1)\land g_1];c_1 \rangle\Yields\langle S_2;s_2 \rangle \\\\
     \langle S_1[g\mapsto g(S_1)\land\neg g_1];c_1 \rangle\Yields\langle S_3;s_3 \rangle \\\\
     S'=\langle (g_1\textrm{?}g(S_2)\textrm{:}g(S_3));(g_1\textrm{?}\rho(S_2)\textrm{:}\rho(S_3));(g_1\textrm{?}\mu(S_2)\textrm{:}\mu(S_3))}
-  {\langle S;\texttt{if $e$ $c_1$ else $c_2$} \rangle\Yields\langle S';\emptyset \rangle}
+  {\langle S;\texttt{if $e$ $c_1$ else $c_2$} \rangle\Yields\langle S';\emptyset:\mathrm{u8} \rangle}
 \end{mathpar}
 
 %% these two may be unnecessary
 
-\begin{mathpar}
-  \inferrule*[Right=\textsc{IfTrue}]
-  {\langle S;e \rangle\Yields\langle S_1;g_1 \rangle \\
-    g(S)\implies g_1 \\
-    \langle S_1;c_1 \rangle\Yields\langle S_2;s \rangle}
-  {\langle S;\texttt{if $e$ $c_1$ else $c_2$ } \rangle\Yields\langle S_2;\emptyset \rangle}
-\end{mathpar}
+% \begin{mathpar}
+%   \inferrule*[Right=\textsc{IfTrue}]
+%   {\langle S;e \rangle\Yields\langle S_1;g_1 \rangle \\
+%     g(S)\implies g_1 \\
+%     \langle S_1;c_1 \rangle\Yields\langle S_2;s \rangle}
+%   {\langle S;\texttt{if $e$ $c_1$ else $c_2$ } \rangle\Yields\langle S_2;\emptyset \rangle}
+% \end{mathpar}
 
-\begin{mathpar}
-  \inferrule*[Right=\textsc{IfFalse}]
-  {\langle S;e \rangle\Yields\langle S_1;g_1 \rangle \\
-    g(S)\implies \neg g_1 \\
-    \langle S_1;c_2 \rangle\Yields\langle S_2;s \rangle}
-  {\langle S;\texttt{if $e$ $c_1$ else $c_2$} \rangle\Yields\langle S_2;\emptyset \rangle}
-\end{mathpar}
+% \begin{mathpar}
+%   \inferrule*[Right=\textsc{IfFalse}]
+%   {\langle S;e \rangle\Yields\langle S_1;g_1 \rangle \\
+%     g(S)\implies \neg g_1 \\
+%     \langle S_1;c_2 \rangle\Yields\langle S_2;s \rangle}
+%   {\langle S;\texttt{if $e$ $c_1$ else $c_2$} \rangle\Yields\langle S_2;\emptyset \rangle}
+% \end{mathpar}
 
 \subsection{Memory}
 
@@ -202,63 +251,107 @@ $S=\langle g;\rho;\mu \rangle$
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{Var}]
-  {\rho(S)[x]=s}
-  {\langle S;x \rangle\Yields\langle S;s \rangle}
+  {x\in\rho(S)\\
+   \rho(S)[x]=\alpha:\Ptr\tau}
+  {\langle S;x \rangle\Yields\langle S;\Sel(\mu(S), \alpha):\tau \rangle}
+\end{mathpar}
+
+
+\begin{mathpar}
+  \inferrule*[Right=\textsc{Ref}]
+  {x\in\rho(S)\\
+   \rho(S)[x]=\alpha:\tau}
+  {\langle S;\texttt{\&}x \rangle\Yields\langle S;\alpha:\tau\rangle}
 \end{mathpar}
 
 \begin{mathpar}
-  \inferrule*[Right=\textsc{DeclareLocal}]
-  {x\not\in \Dom\rho(S)}
-  {\langle S; \texttt{\texttt{$\tau$ $x$;}}\rangle\Yields\langle S[\rho\mapsto (\rho(S), (x\rightarrow\emptyset)];s \rangle}
+  \inferrule*[Right=\textsc{Sel}]
+  {\langle S;e \rangle\Yields\langle S';s \rangle\\ 
+   \tau(s)=\Ptr\tau}
+  {\langle S;\texttt{*}e \rangle\Yields\langle S';\Sel(\mu(S'), s):\tau\rangle}
 \end{mathpar}
 
-\begin{mathpar}
-  \inferrule*[Right=\textsc{DeclareAssignLocal}]
-  {x\not\in \Dom\rho(S) \\
-  \langle S;e \rangle\Yields\langle S';s \rangle}
-  {\langle S; \texttt{\texttt{$\tau$ $x$ = $e$;}}\rangle\Yields\langle S'[\rho\mapsto (\rho(S'), (x\rightarrow s)];s \rangle}
-\end{mathpar}
+%% check that s_2 type compatible with s_1?
 
 \begin{mathpar}
-  \inferrule*[Right=\textsc{UpdLocal}]
-  {\langle S;e_1 \rangle\Yields\langle S_1;\Ptr x \rangle \\ 
-  x\in \Dom\rho(S_1) \\
-  \langle S_1;e_2 \rangle\Yields\langle S_2;s \rangle}
-  {\langle S; \texttt{\texttt{*$e_1$ = $e_2$}}\rangle\Yields\langle S_2[\rho\mapsto (\rho(S_2), (x\rightarrow s)];s \rangle}
-\end{mathpar}
-
-\begin{mathpar}
-  \inferrule*[Right=\textsc{UpdGlobal}]
-  {\langle S;e_1 \rangle\Yields\langle S_1;s_1 \rangle \\ 
-  s_1\not= \Ptr x\\
+  \inferrule*[Right=\textsc{Upd}]
+  {\langle S;e_1 \rangle\Yields\langle S_1;s_1) \rangle \\ 
+  s_1=\Sel(\mu(S_k), s_k):\tau \\
   \langle S_1;e_2 \rangle\Yields\langle S_2;s_2 \rangle}
-  {\langle S; \texttt{\texttt{*$e_1$ = $e_2$}}\rangle\Yields\langle S_2[\mu\mapsto (\mu(S_2), (s_1\rightarrow s_2)];s_2 \rangle}
+  {\langle S; \texttt{\texttt{$e_1$ = $e_2$}}\rangle\Yields\langle S_2[\mu\mapsto\Upd(\mu(S_2), s_k, s_2:\tau)];s_2 \rangle}
 \end{mathpar}
 
 \begin{mathpar}
-  \inferrule*[Right=\textsc{SelLocal}]
-  {\langle S;e \rangle\Yields\langle S';\Ptr x \rangle \\
-  \rho(S')[x]=s}
-  {\langle S; \texttt{\texttt{*$e$}}\rangle\Yields\langle S';s \rangle}
+  \inferrule*[Right=\textsc{Declare}]
+  {x\not\in\Dom(\rho(S)) \\
+    \alpha\textrm{ is fresh}}
+  {\langle S; \texttt{\texttt{$\tau$ $x$;}}\rangle\Yields\langle S[\mu\mapsto\Upd(\mu(S), \alpha, \emptyset:\tau); \rho\mapsto\rho(S)[x\mapsto\alpha:\Ptr\tau]];s \rangle}
 \end{mathpar}
 
 \begin{mathpar}
-  \inferrule*[Right=\textsc{SelGlobal}]
-  {\langle S;e \rangle\Yields\langle S';\Ptr x \rangle \\
-    \rho(S')[x]=s}
-  {\langle S; \texttt{\texttt{*$e$}}\rangle\Yields\langle S';s \rangle}
+  \inferrule*[Right=\textsc{DeclareAssign}]
+  {x\not\in\Dom(\rho(S)) \\
+  \langle S;e \rangle\Yields\langle S';s \rangle \\
+    \alpha\textrm{ is fresh}}
+  {\langle S; \texttt{\texttt{$\tau$ $x$ = $e$;}}\rangle\Yields\langle S'[\mu\mapsto\Upd(\mu(S'),\alpha,s);\rho\mapsto \rho(S')[x\mapsto\alpha:\Ptr\tau]];s \rangle}
 \end{mathpar}
+
+% \begin{mathpar}
+%   \inferrule*[Right=\textsc{UpdLocal}]
+%   {\langle S;e_1 \rangle\Yields\langle S_1;\Ptr x \rangle \\ 
+%   x\in \Dom\rho(S_1) \\
+%   \langle S_1;e_2 \rangle\Yields\langle S_2;s \rangle}
+%   {\langle S; \texttt{\texttt{*$e_1$ = $e_2$}}\rangle\Yields\langle S_2[\rho\mapsto (\rho(S_2), (x\rightarrow s)];s \rangle}
+% \end{mathpar}
+
+% \begin{mathpar}
+%   \inferrule*[Right=\textsc{UpdLocalArr}]
+%   {\textrm{toOffset}(e_1)=\texttt{$x$[$e'$]} \\
+%     \langle S;e' \rangle\Yields\langle S_1;s_1 \rangle \\ 
+%   x\in \Dom\rho(S_1) \\
+%   \langle S_1;e_2 \rangle\Yields\langle S_2;s_2 \rangle}
+%   {\langle S; \texttt{\texttt{*$e_1$ = $e_2$}}\rangle\Yields\langle S_2[\rho\mapsto (\rho(S_2), (x\rightarrow \Upd(\rho(S_2)[x], s_1, s_2))];s \rangle}
+% \end{mathpar}
+
+% \begin{mathpar}
+%   \inferrule*[Right=\textsc{SelLocal}]
+%   {\langle S;e \rangle\Yields\langle S';\Ptr x \rangle \\
+%   \rho(S')[x]=s}
+%   {\langle S; \texttt{\texttt{*$e$}}\rangle\Yields\langle S';s \rangle}
+% \end{mathpar}
+
+% \begin{mathpar}
+%   \inferrule*[Right=\textsc{SelGlobal}]
+%   {\langle S;e \rangle\Yields\langle S';s_1 \rangle \\
+%     s_1 \not= \Ptr{x}}
+%   {\langle S; \texttt{\texttt{*$e$}}\rangle\Yields\langle S';\Sel(\mu(S', s_1)) \rangle}
+% \end{mathpar}
+
+% \begin{mathpar}
+%   \inferrule*[Right=\textsc{IncPreDirect}]
+%   {\rho(S)[x]=s}
+%   {\langle S; \texttt{++$x$} \rangle\Yields\langle S[\rho\mapsto(\rho(S),x\rightarrow s+1)];s+1 \rangle}
+% \end{mathpar}
+
+% \begin{mathpar}
+%   \inferrule*[Right=\textsc{IncPostDirect}]
+%   {\rho(S)[x]=s}
+%   {\langle S; \texttt{$x$++} \rangle\Yields\langle S[\rho\mapsto(\rho(S),x\rightarrow s+1)];s \rangle}
+% \end{mathpar}
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{IncPre}]
-  {\rho(S)[x]=s}
-  {\langle S; \texttt{++$x$} \rangle\Yields\langle S[\rho\mapsto(\rho(S),x\rightarrow s+1)];s+1 \rangle}
+  {\langle S;e \rangle\Yields\langle S';s) \rangle \\
+  s=\Sel(\mu(S_k), s_k):\tau}
+  {\langle S; \texttt{++}e \rangle\Yields\langle S'[\mu\mapsto\Upd(\mu(S'), s_k, s+1:\tau);s+1:\tau]\rangle}
 \end{mathpar}
+
 
 \begin{mathpar}
   \inferrule*[Right=\textsc{IncPost}]
-  {\rho(S)[x]=s}
-  {\langle S; \texttt{$x$++} \rangle\Yields\langle S[\rho\mapsto(\rho(S),x\rightarrow s+1)];s \rangle}
+  {\langle S;e \rangle\Yields\langle S';s) \rangle \\
+  s=\Sel(\mu(S_k), s_k):\tau}
+  {\langle S; \texttt{++}e \rangle\Yields\langle S'[\mu\mapsto\Upd(\mu(S'), s_k, s+1:\tau);s]\rangle}
 \end{mathpar}
 
 \end{document}
