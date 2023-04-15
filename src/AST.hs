@@ -1,4 +1,4 @@
-module Lang where
+module AST where
 
 data Binop = Add | Sub | Mul | Mod | Div -- arithmetic
            | LAnd | LOr -- boolean
@@ -7,29 +7,24 @@ data Binop = Add | Sub | Mul | Mod | Div -- arithmetic
 
 data Unop = Neg | LNot | BNot | Deref
 
-data AssignOp = Assign | MulAssign | DivAssign | ModAssign | AddAssign | SubAssign
-
 data Expr = BinExpr Expr Binop Expr
           | UnExpr Unop Expr
-          | AssignExpr Expr AssignOp Expr
+          | AssignExpr Expr Expr
           | Var Name
           | FunCall Name [Expr]
-          | Ref Name
           | Int Int
           | Str String
           | Char Char
-          | Float Float
-          | Bool Bool
+          | Index Name [Expr]
 
 type Name = String
 
-data Stmt = Expr Expr
+data Stmt = CompoundStmt [Stmt]
+          | Expr Expr
           | IfElse Expr [Stmt] [Stmt]
           | DeclareAssign Name Expr
           | Declare Name
           | Upd Expr Expr -- *e = e;
-          | While Expr [Stmt]
-          | For Stmt Expr Stmt [Stmt]
+          -- | While Expr [Stmt]
+          -- | For Stmt Expr Stmt [Stmt]
           | Return Expr
-
-data Function = Function [Name] [Stmt]
