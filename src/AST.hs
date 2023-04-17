@@ -2,7 +2,7 @@ module AST where
 
 data Binop = Add | Sub | Mul | Mod | Div -- arithmetic
            | LAnd | LOr -- boolean
-           | BAnd | BOr | Shl | Shr -- binary
+           | BAnd | BOr | Shl | Shr -- bitwise
            | Eq | Leq | Geq | Lt | Gt -- comparison
 
 data Unop = Neg | LNot | BNot | Deref

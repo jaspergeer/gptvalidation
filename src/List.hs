@@ -1,5 +1,4 @@
-{-# LANGUAGE InstanceSigs #-}
-module HughesList where
+module List where
 
 data List a = List ([a] -> [a])
 
@@ -22,9 +21,17 @@ asHughesList :: [a] -> List a
 asHughesList xs = List (xs ++)
 
 instance Foldable List where
-  foldr :: (a -> b -> b) -> b -> List a -> b
   foldr f z xs = foldr f z (asList xs)
 
 instance Functor List where
-  fmap :: (a -> b) -> List a -> List b
   fmap f l = List (\ys -> map f (asList l) ++ ys)
+
+instance Monad List where
+  as >>= f = foldr (\a bs -> f a @ bs) empty as
+
+instance Applicative List where
+  fs <*> as =
+    let fs' = asList fs
+        as' = asList as
+    in asHughesList [ f a | f <- fs', a <- as']
+  pure = singleton

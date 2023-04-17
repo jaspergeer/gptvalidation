@@ -1,27 +1,18 @@
 module UnambiguousAST where
 
 import qualified SymbolicExpression as SX
-
-import Data.Int
--- import Data.Word
+import qualified AST
 
 type Name = String
 
-data Binop = Add | Sub | Mul | Mod | Div -- arithmetic
-           | LAnd | LOr -- boolean
-           | BAnd | BOr | Shl | Shr -- binary
-           | Eq | Leq | Geq | Lt | Gt -- comparison
-
-data Unop = Neg | LNot | BNot | Deref
-
-data Expr = BinExpr Expr Binop Expr
-                | UnExpr Unop Expr
+data Expr = BinExpr Expr AST.Binop Expr
+                | UnExpr AST.Unop Expr
                 | Assign Expr Expr
                 | Var Name
                 | FunCall Name [Expr]
                 | Index Name [Expr]
-                | I32 Int32
-                | I8 Int8
+                | Int Integer
+                | Char Char
 
 data Stmt = CompoundStmt [Stmt]
           | Expr Expr
