@@ -5,53 +5,27 @@ import Prelude hiding (sequence, exp)
 import qualified SymbolicExpression as SX
 import qualified Env as E
 import qualified UnambiguousAST as U
-import qualified List as L
-
--- append
-(@) :: L.List a -> L.List a -> L.List a
-a @ b = a L.@ b
-
--- cons
-(&) :: a -> L.List a -> L.List a
-a & b = a L.& b
 
 zero :: SX.Expr
 zero = SX.I32 0
 
-void :: a -> L.List (a, SX.Expr)
-void s = L.singleton (s, zero)
+void :: a -> [(a, SX.Expr)]
+void s = [(s, zero)]
 
 type VarEnv = E.Env (SX.Expr, SX.Type)
 
 -- symbolic state: (g, rho, mu)
 type SymbolicState = (SX.Expr, VarEnv, VarEnv)
 
-data Branching a b = Branching { runBranching :: a -> L.List b}
-
--- instance Applicative (Branching a) where
---   f <*> a = Branching ()
---   pure x = Branching (\_ -> L.singleton x)
-
--- instance Monad (Branching a) where
---   (>>=) :: Branching a1 a2 -> (a2 -> Branching a1 b) -> Branching a1 b
---   a >>= f = Branching (\x -> 
---     let 
---       as = runBranching a x
---       cs = foldr (\a cs -> f a @ cs) L.empty as
---     in undefined)
-
 -- symbolic execution with branches
-type SymbolicExecutor a = (SymbolicState, a) -> L.List (SymbolicState, SX.Expr)
-
-execmany :: SymbolicExecutor a -> L.List (SymbolicState, a) -> L.List (SymbolicState, SX.Expr)
-execmany exec = foldr (\x branches -> exec x @ branches) L.empty
+type SymbolicExecutor a = (SymbolicState, a) -> [(SymbolicState, SX.Expr)]
 
 sequence :: SymbolicExecutor a -> SymbolicExecutor [a]
 sequence exec (s1, as) =
   let
     start = void s1
-    makeNewStarts branches a = foldr (\(state, _) starts -> (state, a) & starts) L.empty branches
-  in foldl (\branches a -> execmany exec (makeNewStarts branches a)) start as
+    makeNewStarts branches a = foldr (\(state, _) starts -> (state, a) : starts) [] branches
+  in foldl (\branches a -> makeNewStarts branches a >>= exec) start as
 
 stmt :: SymbolicExecutor U.Stmt
 stmt (state, c) = case c of
