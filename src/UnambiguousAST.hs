@@ -13,13 +13,14 @@ data Expr = BinExpr Expr AST.Binop Expr
                 | Index Name [Expr]
                 | Int Integer
                 | Char Char
+                | Deref Expr
 
 data Stmt = CompoundStmt [Stmt]
           | Expr Expr
-          | IfElse Expr [Stmt] [Stmt]
-          | DeclareHeap SX.Type Name Name
-          | DeclareStackArr SX.Type Name Name
-          | DeclareStack SX.Type Name
+          | IfElse Expr Stmt Stmt
+          | DeclareHeapObj SX.Generic Name Name
+          | DeclareStack SX.Base Name
+          | DeclareStackObj SX.Generic Name Name
           | Upd Expr Expr -- *e = e;
           | While Expr [Stmt]
           | For Stmt Expr Stmt [Stmt]

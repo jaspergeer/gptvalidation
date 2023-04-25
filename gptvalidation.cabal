@@ -78,7 +78,8 @@ executable gptvalidation
     build-depends:    base ^>=4.17.0.0,
                       parsec,
                       sbv,
-                      containers
+                      containers,
+                      transformers
 
     -- Directories containing source files.
     hs-source-dirs:   app, src
