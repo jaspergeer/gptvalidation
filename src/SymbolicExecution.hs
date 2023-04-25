@@ -24,7 +24,14 @@ data SymExException = NotBound Name Name
                     | NotPointer Name
                     | AlreadyBound Name Name
                     | UnknownAlias
-                    deriving Show
+                    | Unsupported String
+
+instance Show SymExException where
+  show (NotBound x env) = "name " ++ x ++ " not bound in environment " ++ env
+  show (NotPointer x) = "name " ++ x ++ " is not bound to a pointer"
+  show (AlreadyBound x env) = "name " ++ x ++ " already bound in environemnt " ++ env
+  show UnknownAlias = "cannot determine the memory location pointed to by expression"
+  show (Unsupported feature) = feature ++ " is not supported"
 
 instance Exception SymExException
 
@@ -105,11 +112,11 @@ stmt (state, c) = case c of
   U.Expr e -> (\(s', _) -> (s', zero)) <$> exp (state, e)
   U.IfElse e c1 c2 -> do
     (state', g1) <- exp (state, e)
-    let state1 = state' {g = SX.BinExpr (g state') AST.LAnd g1}
+    let state_1 = state' {g = SX.BinExpr (g state') AST.LAnd g1}
     let notg1 = SX.UnExpr AST.LNot g1
-    let state2 = state' {g = SX.BinExpr (g state') AST.LAnd notg1}
-    r1 <- stmt (state1, c1)
-    r2 <- stmt (state2, c2)
+    let state_2 = state' {g = SX.BinExpr (g state') AST.LAnd notg1}
+    r1 <- stmt (state_1, c1)
+    r2 <- stmt (state_2, c2)
     [r1, r2]
   U.DeclareStack b x ->
     return (state { rho = bindNewRho x (zero, SX.Base b) state}, zero)
@@ -125,8 +132,8 @@ stmt (state, c) = case c of
       state' = state { mu = bindNewMu a (SX.NewArr (dim tau) (base tau), tau) state }
       state'' = state' { rho = bindNewRho x (SX.PtrTo a, SX.Generic (SX.Ptr tau)) state}
     in return (state'', zero)
-
-  _ -> error "TODO"
+  U.Return e -> exp (state, e)
+  _ -> throw (Unsupported "loops")
 
 toOffset :: SX.Expr -> SX.Expr
 toOffset s = case s of
@@ -142,6 +149,22 @@ toOffset s = case s of
       _ -> s
   _ -> s
 
+many :: SymbolicState -> SymbolicExecutor U.Expr -> [U.Expr] -> [(SymbolicState, [SX.Expr])]
+many state exec = foldlM (\(state_i, is) e' -> do
+        (state_i1, i) <- exec (state_i, e')
+        return (state_i1, i:is)) (state, [])
+
+updAtAddr :: Name -> [SX.Expr] -> SX.Expr -> SymbolicState -> SymbolicState
+updAtAddr addr indices newval state =
+  if rho state `E.binds` addr then
+    let
+      s = valInRho addr state
+    in state { rho = bindInRho addr (SX.Upd s indices newval) state }
+  else
+    let
+      s = valInMu addr state
+    in state { mu = bindInMu addr (SX.Upd s indices newval) state }
+
 exp :: SymbolicExecutor U.Expr
 exp (state, e) = case e of
   U.BinExpr e_1 op e_2 -> do
@@ -155,34 +178,37 @@ exp (state, e) = case e of
     (state', s) <- exp (state, e_1)
     return (state' { rho = E.bind x (s, typeInRho x state) (rho state') }, s)
   U.Assign (U.Index x es) e_v -> do
-    (state_n1, is) <-
-      foldlM (\(state_i, is) e' -> do
-        (state_i1, i) <- exp (state_i, e')
-        return (state_i1, i:is)) (state, []) es
+    (state_n1, is) <- many state exp es
     (state', s') <- exp (state_n1, e_v)
     case valInRho x state_n1 of
-      SX.PtrTo a ->
-        if rho state' `E.binds` a then
-          let
-            s = valInRho a state'
-          in
-          return (state' { rho = bindInRho a (SX.Upd s is s') state' }, s')
-        else
-          let
-            s = valInMu a state'
-          in
-          return (state' { mu = bindInMu a (SX.Upd s is s') state' }, s')
+      SX.PtrTo a -> return (updAtAddr a is s' state', s')
       _ -> throw (NotPointer x)
-  U.Deref e1 -> do
-    (state', s) <- exp (state, e1)
-    case s of
-      SX.BinExpr (SX.PtrTo a) AST.Add s1 ->
-        if rho state' `E.binds` a then
-          return (state', SX.Sel (valInRho a state') [s1])
-        else
-          return (state', SX.Sel (valInMu a state') [s1])
+  U.Assign (U.Deref e_1) e_2 -> do
+    (state_1, s_1) <- exp (state, e_1)
+    (state_2, s_2) <- exp (state_1, e_2)
+    case toOffset s_1 of
+      SX.BinExpr (SX.PtrTo a) AST.Add i ->
+        return (updAtAddr a [i] s_2 state_2, s_2)
       _ -> throw UnknownAlias
-
-
-
-  _ -> error "TODO"
+  U.Assign {} -> throw (Unsupported "assignment with complex left-hand sides")
+  U.Deref e_1 -> do
+    (state', s) <- exp (state, e_1)
+    case s of
+      SX.BinExpr (SX.PtrTo a) AST.Add s_1 ->
+        if rho state' `E.binds` a then
+          return (state', SX.Sel (valInRho a state') [s_1])
+        else
+          return (state', SX.Sel (valInMu a state') [s_1])
+      _ -> throw UnknownAlias
+  U.Var x -> return (state, valInRho x state)
+  U.Index x es -> do
+    (state_n1, is) <- many state exp es
+    if rho state `E.binds` x then
+      return (state, SX.Sel (valInRho x state_n1) is)
+    else
+      return (state, SX.Sel (valInMu x state_n1) is)
+  U.Int i -> return (state, SX.I32 i)
+  U.Char c -> return (state, SX.I8 (fromEnum c))
+  U.FunCall f es -> do
+    (state', args) <- many state exp es
+    return (state', SX.FunCall f args)

@@ -11,8 +11,8 @@ data Expr = BinExpr Expr AST.Binop Expr
           | Upd Expr [Expr] Expr
           | FunCall Name [Expr]
           | Choice Expr Expr Expr
-          | I32 Int32
-          | I8 Int8
+          | I32 Int
+          | I8 Int
           | NewArr Int Base
           | Cast Type Expr
           | PtrTo Name

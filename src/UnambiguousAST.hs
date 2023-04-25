@@ -11,7 +11,7 @@ data Expr = BinExpr Expr AST.Binop Expr
                 | Var Name
                 | FunCall Name [Expr]
                 | Index Name [Expr]
-                | Int Integer
+                | Int Int
                 | Char Char
                 | Deref Expr
 
@@ -21,7 +21,6 @@ data Stmt = CompoundStmt [Stmt]
           | DeclareHeapObj SX.Generic Name Name
           | DeclareStack SX.Base Name
           | DeclareStackObj SX.Generic Name Name
-          | Upd Expr Expr -- *e = e;
           | While Expr [Stmt]
           | For Stmt Expr Stmt [Stmt]
           | Return Expr
