@@ -1,7 +1,6 @@
 module SymbolicExpression where
 
 import qualified AST
-import Data.Int
 
 type Name = String
 
@@ -14,10 +13,10 @@ data Expr = BinExpr Expr AST.Binop Expr
           | I32 Int
           | I8 Int
           | NewArr Int Base
-          | Cast Type Expr
+          | Enforce Type Expr
           | PtrTo Name
 
 data Base = Int32 | Int8 | U32
-data Generic = Ptr Type | Fun [Base] Base
+data Generic = Ptr Type | Arr Int Base | Fun [Base] Base
 
 data Type = Generic Generic | Base Base

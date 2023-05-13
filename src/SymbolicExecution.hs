@@ -27,62 +27,65 @@ data SymExException = NotBound Name Name
                     | Unsupported String
 
 instance Show SymExException where
-  show (NotBound x env) = "name " ++ x ++ " not bound in environment " ++ env
-  show (NotPointer x) = "name " ++ x ++ " is not bound to a pointer"
-  show (AlreadyBound x env) = "name " ++ x ++ " already bound in environemnt " ++ env
-  show UnknownAlias = "cannot determine the memory location pointed to by expression"
-  show (Unsupported feature) = feature ++ " is not supported"
+  show ex = case ex of
+    NotBound x env -> "name " ++ x ++ " not bound in environment " ++ env
+    NotPointer x -> "name " ++ x ++ " is not bound to a pointer"
+    AlreadyBound x env -> "name " ++ x ++ " already bound in environemnt " ++ env
+    UnknownAlias -> "cannot determine the memory location pointed to by expression"
+    Unsupported feature -> feature ++ " not supported"
 
 instance Exception SymExException
 
-typeInRho :: Name -> SymbolicState -> SX.Type
-typeInRho x state = case E.find x (rho state) of
-  Just (_, tau) -> tau
-  _ -> throw (NotBound x "rho")
+-- helper functions for interacting with environments
 
-typeInMu :: Name -> SymbolicState -> SX.Type
-typeInMu x state = case E.find x (mu state) of
+typeIn :: (SymbolicState -> VarEnv) -> Name -> (Name -> SymbolicState -> SX.Type)
+typeIn getenv envname x state = case E.find x (getenv state) of
   Just (_, tau) -> tau
-  _ -> throw (NotBound x "mu")
+  _ -> throw (NotBound x envname)
+
+typeInRho :: E.Name -> SymbolicState -> SX.Type
+typeInRho = typeIn rho "rho"
+
+typeInMu :: E.Name -> SymbolicState -> SX.Type
+typeInMu = typeIn mu "mu"
+
+valIn :: (SymbolicState -> VarEnv) -> Name -> (Name -> SymbolicState -> SX.Expr)
+valIn getenv envname x state = case E.find x (getenv state) of
+  Just (s, _) -> s
+  _ -> throw (NotBound x envname)
 
 valInRho :: Name -> SymbolicState -> SX.Expr
-valInRho x state = case E.find x (rho state) of
-  Just (s, _) -> s
-  _ -> throw (NotBound x "rho")
+valInRho = valIn rho "rho"
 
 valInMu :: Name -> SymbolicState -> SX.Expr
-valInMu x state = case E.find x (mu state) of
-  Just (s, _) -> s
-  _ -> throw (NotBound x "mu")
+valInMu = valIn mu "mu"
 
+bindIn :: (SymbolicState -> VarEnv) -> Name -> (Name -> SX.Expr -> SymbolicState -> VarEnv)
+bindIn getenv envname x e state = 
+  let env' = getenv state
+      tau = typeIn getenv envname x state in
+      E.bind x (e, tau) env'
 
 bindInRho :: Name -> SX.Expr -> SymbolicState -> E.Env (SX.Expr, SX.Type)
-bindInRho x e state =
-  let rho' = rho state
-      tau = typeInRho x state in
-        E.bind x (e, tau) rho'
+bindInRho = bindIn rho "rho"
 
 bindInMu :: Name -> SX.Expr -> SymbolicState -> E.Env (SX.Expr, SX.Type)
-bindInMu x e state =
-  let mu' = mu state
-      tau = typeInMu x state in
-        E.bind x (e, tau) mu'
+bindInMu = bindIn mu "mu"
 
-bindNewRho :: E.Name -> (SX.Expr, SX.Type) -> SymbolicState -> E.Env (SX.Expr, SX.Type)
-bindNewRho x y state =
-  let rho' = rho state in
-    if rho' `E.binds` x then throw (AlreadyBound x "rho")
-    else E.bind x y rho'
+bindNew :: (SymbolicState -> VarEnv) -> Name -> (Name -> (SX.Expr, SX.Type) -> SymbolicState -> E.Env (SX.Expr, SX.Type))
+bindNew getenv envname x y state = 
+  let env' = getenv state in
+    if env' `E.binds` x then throw (AlreadyBound x envname)
+    else E.bind x y env'
 
+bindNewRho :: Name -> (SX.Expr, SX.Type) -> SymbolicState -> E.Env (SX.Expr, SX.Type)
+bindNewRho = bindNew rho "rho"
 
-bindNewMu :: E.Name -> (SX.Expr, SX.Type) -> SymbolicState -> E.Env (SX.Expr, SX.Type)
-bindNewMu x y state =
-  let mu' = mu state in
-    if mu' `E.binds` x then throw (AlreadyBound x "rho")
-    else E.bind x y mu'
+bindNewMu :: Name -> (SX.Expr, SX.Type) -> SymbolicState -> E.Env (SX.Expr, SX.Type)
+bindNewMu = bindNew mu "mu"
 
--- symbolic state: (g, rho, mu)
-data SymbolicState = SymbolicState { g ::SX.Expr, rho :: VarEnv, mu :: VarEnv }
+-- symbolic state: {g, rho, mu}
+data SymbolicState = SymbolicState { g :: SX.Expr, rho :: VarEnv, mu :: VarEnv }
 
 -- symbolic execution with branches
 type SymbolicExecutor a = (SymbolicState, a) -> [(SymbolicState, SX.Expr)]
@@ -97,6 +100,7 @@ sequence exec (s1, as) =
 dim :: SX.Type -> Int
 dim tau = case tau of
   SX.Base _ -> 0
+  SX.Generic (SX.Arr i _) -> i
   SX.Generic (SX.Ptr tau') -> 1 + dim tau'
   SX.Generic (SX.Fun {}) -> error "dim of function"
 
@@ -159,11 +163,13 @@ updAtAddr addr indices newval state =
   if rho state `E.binds` addr then
     let
       s = valInRho addr state
-    in state { rho = bindInRho addr (SX.Upd s indices newval) state }
+      tau = SX.Base $ base (typeInRho addr state)
+    in state { rho = bindInRho addr (SX.Upd (SX.Enforce tau s) indices newval) state }
   else
     let
       s = valInMu addr state
-    in state { mu = bindInMu addr (SX.Upd s indices newval) state }
+      tau = SX.Base $ base (typeInMu addr state)
+    in state { mu = bindInMu addr (SX.Upd (SX.Enforce tau s) indices newval) state }
 
 exp :: SymbolicExecutor U.Expr
 exp (state, e) = case e of
@@ -175,8 +181,9 @@ exp (state, e) = case e of
     (state', s) <- exp (state, e_1)
     return (state', SX.UnExpr op s)
   U.Assign (U.Var x) e_1 | rho state `E.binds` x -> do
+    let tau = typeInRho x state
     (state', s) <- exp (state, e_1)
-    return (state' { rho = E.bind x (s, typeInRho x state) (rho state') }, s)
+    return (state' { rho = E.bind x (SX.Enforce tau s, tau) (rho state') }, s)
   U.Assign (U.Index x es) e_v -> do
     (state_n1, is) <- many state exp es
     (state', s') <- exp (state_n1, e_v)
@@ -190,7 +197,7 @@ exp (state, e) = case e of
       SX.BinExpr (SX.PtrTo a) AST.Add i ->
         return (updAtAddr a [i] s_2 state_2, s_2)
       _ -> throw UnknownAlias
-  U.Assign {} -> throw (Unsupported "assignment with complex left-hand sides")
+  U.Assign {} -> throw (Unsupported "assignment with complex left-hand side")
   U.Deref e_1 -> do
     (state', s) <- exp (state, e_1)
     case s of
