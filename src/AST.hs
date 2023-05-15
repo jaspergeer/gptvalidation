@@ -1,13 +1,16 @@
 module AST where
 
-data Binop = Add | Sub | Mul | Mod | Div -- arithmetic
-           | LAnd | LOr -- boolean
-           | BAnd | BOr | Shl | Shr -- bitwise
-           | Eq | Leq | Geq | Lt | Gt -- comparison
+data ArithOp = Add | Sub | Mul | Mod | Div -- arithmetic
+data LogOp = LAnd | LOr -- boolean
+data BitOp = BAnd | BOr | Shl | Shr -- bitwise
+data RelOp = Eq | Leq | Geq | Lt | Gt -- comparison
 
 data Unop = Neg | LNot | BNot
 
-data Expr = BinExpr Expr Binop Expr
+data Expr = ArithExpr Expr ArithOp Expr
+          | LogExpr Expr LogOp Expr
+          | BitExpr Expr BitOp Expr
+          | RelExpr Expr RelOp Expr
           | UnExpr Unop Expr
           | AssignExpr Expr Expr
           | Var Name

@@ -9,7 +9,10 @@ type Name = String
 
 -- Upd should never appear except as a subexpression of Sel
 
-data Expr = BinExpr Expr AST.Binop Expr
+data Expr = ArithExpr Expr AST.ArithOp Expr
+          | LogExpr Expr AST.LogOp Expr
+          | BitExpr Expr AST.BitOp Expr
+          | RelExpr Expr AST.RelOp Expr
           | UnExpr AST.Unop Expr
           | Sel Expr [Expr]
           | Upd Expr [Expr] Expr
@@ -17,7 +20,7 @@ data Expr = BinExpr Expr AST.Binop Expr
           | Choice Expr Expr Expr
           | Literal Integer
           | NewArr Int Base
-          | Enforce Type Expr
+          | FromType Type Expr
           | PtrTo Name
 
 data Base = Int32 | Int8 | U32

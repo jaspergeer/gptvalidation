@@ -14,7 +14,7 @@ import Data.Foldable (foldlM)
 -- but I wanted to keep it pure
 
 zero :: X.Expr
-zero = mkI32 0
+zero = X.Literal 0
 
 void :: a -> [(a, X.Expr)]
 void s = [(s, zero)]
@@ -54,7 +54,7 @@ typeInMu = typeIn mu "mu"
 
 valIn :: (SymbolicState -> VarEnv) -> Name -> (Name -> SymbolicState -> X.Expr)
 valIn getenv envname x state = case E.find x (getenv state) of
-  Just (s, _) -> s
+  Just (s, _) -> X.FromType (typeIn getenv envname x state) s
   _ -> throw (NotBound x envname)
 
 valInRho :: Name -> SymbolicState -> X.Expr
@@ -106,9 +106,9 @@ stmt (state, c) = case c of
   U.Expr e -> (\(s', _) -> (s', zero)) <$> exp (state, e)
   U.IfElse e c1 c2 -> do
     (state', g1) <- exp (state, e)
-    let state_1 = state' {g = X.BinExpr (g state') AST.LAnd g1}
+    let state_1 = state' {g = X.LogExpr (g state') AST.LAnd g1}
     let notg1 = X.UnExpr AST.LNot g1
-    let state_2 = state' {g = X.BinExpr (g state') AST.LAnd notg1}
+    let state_2 = state' {g = X.LogExpr (g state') AST.LAnd notg1}
     r1 <- stmt (state_1, c1)
     r2 <- stmt (state_2, c2)
     [r1, r2]
@@ -131,15 +131,15 @@ stmt (state, c) = case c of
 
 toOffset :: X.Expr -> X.Expr
 toOffset s = case s of
-  X.PtrTo _ -> X.BinExpr s AST.Add zero
-  X.BinExpr s1 AST.Add s2 -> case
+  X.PtrTo _ -> X.ArithExpr s AST.Add zero
+  X.ArithExpr s1 AST.Add s2 -> case
     (toOffset s1, toOffset s2) of
-      (X.BinExpr s3@(X.PtrTo _) AST.Add s4, s2') -> X.BinExpr s3 AST.Add (X.BinExpr s4 AST.Add s2')
-      (s1', X.BinExpr s3@(X.PtrTo _) AST.Add s4) -> X.BinExpr s3 AST.Add (X.BinExpr s1' AST.Add s4)
+      (X.ArithExpr s3@(X.PtrTo _) AST.Add s4, s2') -> X.ArithExpr s3 AST.Add (X.ArithExpr s4 AST.Add s2')
+      (s1', X.ArithExpr s3@(X.PtrTo _) AST.Add s4) -> X.ArithExpr s3 AST.Add (X.ArithExpr s1' AST.Add s4)
       _ -> s
-  X.BinExpr s1 AST.Sub s2 -> case
+  X.ArithExpr s1 AST.Sub s2 -> case
     toOffset s1 of
-      X.BinExpr s3@(X.PtrTo _) AST.Add s4 -> X.BinExpr s3 AST.Add (X.BinExpr s4 AST.Sub s2)
+      X.ArithExpr s3@(X.PtrTo _) AST.Add s4 -> X.ArithExpr s3 AST.Add (X.ArithExpr s4 AST.Sub s2)
       _ -> s
   _ -> s
 
@@ -153,33 +153,37 @@ updAtAddr addr indices newval state =
   if rho state `E.binds` addr then
     let
       s = valInRho addr state
-      tau = X.Base $ X.base (typeInRho addr state)
-    in state { rho = bindInRho addr (X.Upd (X.Enforce tau s) indices newval) state }
+    in state { rho = bindInRho addr (X.Upd s indices newval) state }
   else
     let
       s = valInMu addr state
-      tau = X.Base $ X.base (typeInMu addr state)
-    in state { mu = bindInMu addr (X.Upd (X.Enforce tau s) indices newval) state }
-
-mkI32 :: Integer -> X.Expr
-mkI32 = X.Enforce (X.Base X.Int32) . X.Literal
-
-mkI8 :: Integer -> X.Expr
-mkI8 = X.Enforce (X.Base X.Int8) . X.Literal
+    in state { mu = bindInMu addr (X.Upd s indices newval) state }
 
 exp :: SymbolicExecutor U.Expr
 exp (state, e) = case e of
-  U.BinExpr e_1 op e_2 -> do
+  U.ArithExpr e_1 op e_2 -> do
     (state_1 , s_1) <- exp (state, e_1)
     (state_2, s_2) <- exp (state_1, e_2)
-    return (state_2, X.BinExpr s_1 op s_2)
+    return (state_2, X.ArithExpr s_1 op s_2)
+  U.LogExpr e_1 op e_2 -> do
+    (state_1 , s_1) <- exp (state, e_1)
+    (state_2, s_2) <- exp (state_1, e_2)
+    return (state_2, X.LogExpr s_1 op s_2)
+  U.BitExpr e_1 op e_2 -> do
+    (state_1 , s_1) <- exp (state, e_1)
+    (state_2, s_2) <- exp (state_1, e_2)
+    return (state_2, X.BitExpr s_1 op s_2)
+  U.RelExpr e_1 op e_2 -> do
+    (state_1 , s_1) <- exp (state, e_1)
+    (state_2, s_2) <- exp (state_1, e_2)
+    return (state_2, X.RelExpr s_1 op s_2)
   U.UnExpr op e_1 -> do
     (state', s) <- exp (state, e_1)
     return (state', X.UnExpr op s)
   U.Assign (U.Var x) e_1 | rho state `E.binds` x -> do
     let tau = typeInRho x state
     (state', s) <- exp (state, e_1)
-    return (state' { rho = E.bind x (X.Enforce tau s, tau) (rho state') }, s)
+    return (state' { rho = E.bind x (s, tau) (rho state') }, s)
   U.Assign (U.Index x es) e_v -> do
     (state_n1, is) <- many state exp es
     (state', s') <- exp (state_n1, e_v)
@@ -190,14 +194,14 @@ exp (state, e) = case e of
     (state_1, s_1) <- exp (state, e_1)
     (state_2, s_2) <- exp (state_1, e_2)
     case toOffset s_1 of
-      X.BinExpr (X.PtrTo a) AST.Add i ->
+      X.ArithExpr (X.PtrTo a) AST.Add i ->
         return (updAtAddr a [i] s_2 state_2, s_2)
       _ -> throw UnknownAlias
   U.Assign {} -> throw (Unsupported "assignment with complex left-hand side")
   U.Deref e_1 -> do
     (state', s) <- exp (state, e_1)
     case s of
-      X.BinExpr (X.PtrTo a) AST.Add s_1 ->
+      X.ArithExpr (X.PtrTo a) AST.Add s_1 ->
         if rho state' `E.binds` a then
           return (state', X.Sel (valInRho a state') [s_1])
         else
@@ -210,8 +214,8 @@ exp (state, e) = case e of
       return (state, X.Sel (valInRho x state_n1) is)
     else
       return (state, X.Sel (valInMu x state_n1) is)
-  U.Int i -> return (state, mkI32 i)
-  U.Char c -> return (state, mkI8 (toInteger (fromEnum c)))
+  U.Int i -> return (state, X.Literal i)
+  U.Char c -> return (state, X.Literal (toInteger (fromEnum c)))
   U.FunCall f es -> do
     (state', args) <- many state exp es
     return (state', X.FunCall f args)

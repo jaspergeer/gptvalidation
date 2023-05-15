@@ -5,15 +5,18 @@ import qualified AST
 
 type Name = String
 
-data Expr = BinExpr Expr AST.Binop Expr
-                | UnExpr AST.Unop Expr
-                | Assign Expr Expr
-                | Var Name
-                | FunCall Name [Expr]
-                | Index Name [Expr]
-                | Int Integer
-                | Char Char
-                | Deref Expr
+data Expr = ArithExpr Expr AST.ArithOp Expr
+          | LogExpr Expr AST.LogOp Expr
+          | BitExpr Expr AST.BitOp Expr
+          | RelExpr Expr AST.RelOp Expr
+          | UnExpr AST.Unop Expr
+          | Assign Expr Expr
+          | Var Name
+          | FunCall Name [Expr]
+          | Index Name [Expr]
+          | Int Integer
+          | Char Char
+          | Deref Expr
 
 data Stmt = CompoundStmt [Stmt]
           | Expr Expr
