@@ -64,12 +64,13 @@ executable gptvalidation
     other-modules:
       AST,
       UnambiguousAST,
+      Disambiguate,
       Env,
       SymbolicExecution,
       SymbolicExpression,
       Env,
       List,
-      Solve
+      SBVConvert
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions: OverloadedLists

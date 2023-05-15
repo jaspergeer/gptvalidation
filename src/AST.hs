@@ -12,7 +12,7 @@ data Expr = BinExpr Expr Binop Expr
           | AssignExpr Expr Expr
           | Var Name
           | FunCall Name [Expr]
-          | Int Int
+          | Int Integer
           | Str String
           | Char Char
           | Index Name [Expr]

@@ -11,7 +11,7 @@ data Expr = BinExpr Expr AST.Binop Expr
                 | Var Name
                 | FunCall Name [Expr]
                 | Index Name [Expr]
-                | Int Int
+                | Int Integer
                 | Char Char
                 | Deref Expr
 
