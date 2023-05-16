@@ -1,24 +1,14 @@
 {-# LANGUAGE FlexibleContexts #-}
+
 module SBVConvert where
 
+import qualified AST
+import qualified SymbolicExecution as E
 import qualified SymbolicExpression as X
 import Data.SBV
 import Data.SBV.Tuple
-import qualified AST
 
-i8kind :: Kind
-i8kind = KBounded True 8
-
-i32kind :: Kind
-i32kind = KBounded True 32
-
-u32kind :: Kind
-u32kind = KBounded False 32
-
-toKind :: X.Base -> Kind
-toKind X.Int32 = i32kind
-toKind X.Int8 = i8kind
-toKind X.U32 = u32kind
+import Data.Map (toList)
 
 -- Array helpers
 toArrN :: (SFiniteBits a, SDivisible (SBV a), SIntegral a, SymVal a, HasKind tup) => ([SBV Int32] -> SBV tup) -> X.Expr -> Symbolic (SArray tup a)
@@ -26,8 +16,8 @@ toArrN tupleN e = case e of
   X.NewArr {} -> newArray_ Nothing
   X.Upd e1 es e2 -> do
     arr <- toArrN tupleN e1
-    is <- tupleN <$> mapM toSBV es
-    val <- toSBV e2
+    is <- tupleN <$> mapM convertExp es
+    val <- convertExp e2
     return $ writeArray arr is val
   _ -> error "tried to interpret non-array value as array"
 
@@ -45,22 +35,22 @@ toArr1 = toArrN tuple1
 toArr2 :: (SFiniteBits b, SIntegral b, SymVal b, SDivisible (SBV b)) => X.Expr -> Symbolic (SArray (Int32, Int32) b)
 toArr2 = toArrN tuple2
 
-toSBV :: (SFiniteBits a, SDivisible (SBV a), SIntegral a, SymVal a, Num a, Ord a) => X.Expr -> Symbolic (SBV a)
-toSBV e = case e of
+convertExp :: (SFiniteBits a, SDivisible (SBV a), SIntegral a, SymVal a, Num a, Ord a) => X.Expr -> Symbolic (SBV a)
+convertExp e = case e of
   X.Literal i -> free $ show i
   X.FromType tau e1 -> case tau of
     X.Generic (X.Ptr _) -> do
-      s <- toSBV e1 :: Symbolic (SBV Word32)
+      s <- convertExp e1 :: Symbolic (SBV Word32)
       return $ sFromIntegral s
     X.Base X.Int32 -> do
-      s <- toSBV e1 :: Symbolic (SBV Int32)
+      s <- convertExp e1 :: Symbolic (SBV Int32)
       return $ sFromIntegral s
     X.Base X.Int8 -> do
-      s <- toSBV e1 :: Symbolic (SBV Int8)
+      s <- convertExp e1 :: Symbolic (SBV Int8)
       return $ sFromIntegral s
     _ -> error "tried to enforce non-integral type"
   X.Sel e1 es -> do
-    x <- mapM toSBV es
+    x <- mapM convertExp es
     case es of
       [_] -> do
         arr <- toArr1 e1
@@ -69,9 +59,9 @@ toSBV e = case e of
         arr <- toArr2 e1
         return $ readArray arr (tuple2 x)
       _ -> error "higher dimensional arrays not supported"
-  X.ArithExpr e1 op e2 ->
+  X.ArithExpr e1 binop e2 ->
     let
-      convertArith aop = case aop of
+      convertArith op = case op of
         AST.Add -> (+)
         AST.Sub -> (-)
         AST.Mul -> (*)
@@ -79,45 +69,45 @@ toSBV e = case e of
         AST.Mod -> sMod
     in
       do
-        s1 <- toSBV e1
-        s2 <- toSBV e2
-        return $ convertArith op s1 s2
-  X.LogExpr e1 op e2 ->
+        s1 <- convertExp e1
+        s2 <- convertExp e2
+        return $ convertArith binop s1 s2
+  X.LogExpr e1 binop e2 ->
     let
-      convertLog lop = case lop of
+      convertLog op = case op of
         AST.LAnd -> (.&&)
         AST.LOr -> (.||)
     in do
-      s1 <- toSBV e1 :: Symbolic SInt32 -- according to C99
+      s1 <- convertExp e1 :: Symbolic SInt32 -- according to C99
       let b1 = s1 ./= 0
-      s2 <- toSBV e2 :: Symbolic SInt32
+      s2 <- convertExp e2 :: Symbolic SInt32
       let b2 = s2 ./= 0
-      return $ oneIf (convertLog op b1 b2)
-  X.BitExpr e1 op e2 ->
+      return $ oneIf (convertLog binop b1 b2)
+  X.BitExpr e1 binop e2 ->
     let
-      convertBit bop = case bop of
+      convertBit op = case op of
         AST.BAnd -> (.&.)
         AST.BOr -> (.|.)
         AST.Shl -> sShiftLeft
         AST.Shr -> sSignedShiftArithRight
     in do
-      s1 <- toSBV e1
-      s2 <- toSBV e2
-      return $ convertBit op s1 s2
-  X.RelExpr e1 op e2 ->
+      s1 <- convertExp e1
+      s2 <- convertExp e2
+      return $ convertBit binop s1 s2
+  X.RelExpr e1 binop e2 ->
     let
-      convertRel rop = case rop of
+      convertRel op = case op of
         AST.Eq -> (.==)
         AST.Leq -> (.<=)
         AST.Geq -> (.>=)
         AST.Lt -> (.<)
         AST.Gt -> (.>)
     in do
-      s1 <- toSBV e1 :: Symbolic SInt32
-      s2 <- toSBV e2 :: Symbolic SInt32
-      return $ oneIf (convertRel op s1 s2)
+      s1 <- convertExp e1 :: Symbolic SInt32
+      s2 <- convertExp e2 :: Symbolic SInt32
+      return $ oneIf (convertRel binop s1 s2)
   X.UnExpr op e1 -> do
-    s1 <- toSBV e1
+    s1 <- convertExp e1
     case op of
       AST.Neg ->
         return $ negate s1
@@ -125,11 +115,25 @@ toSBV e = case e of
         return $ oneIf (s1 .== 0)
       AST.BNot ->
         return $ complement s1
+  X.PtrTo n -> return $ sym ("_ptrto_" ++ n)
   X.NewArr {} -> error "array encountered as value"
   X.Upd {} -> error "array encountered as value"
   _ -> error "TODO"
 
+-- Each heap object becomes an uninterpreted function with a constraint
+convertEnv :: E.VarEnv -> Symbolic [()]
+convertEnv env =
+  let
+    convertBinding (n, (e, tau)) =
+      case X.dim tau of
+        1 -> do
+          let f = uninterpret n :: SBV Int32 -> SWord32
+          arr <- toArr1 e
+          constrain $ \(Forall x) -> readArray arr x .== f x
+        2 -> do
+          let f = uninterpret n :: SBV (Int32, Int32) -> SWord32
+          arr <- toArr2 e
+          constrain $ \(Forall x) -> readArray arr x .== f x
+        _ -> error ""
+  in mapM convertBinding (toList env)
 
-
--- convertEnv :: E.VarEnv -> Symbolic SVal
--- convertEnv = error "TODO"
