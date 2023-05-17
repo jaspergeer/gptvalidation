@@ -6,8 +6,7 @@ import qualified AST
 import qualified SymbolicExecution as E
 import qualified SymbolicExpression as X
 import Data.SBV
-import Data.SBV.Tuple
-
+import Data.SBV.Tuple ( tuple )
 import Data.Map (toList)
 
 -- data SBVConvertException = 
@@ -133,22 +132,29 @@ convertExp e = case e of
   X.Upd {} -> error "array encountered as value"
   _ -> error "TODO"
 
--- Each heap object becomes an uninterpreted function with a constraint
-convertEnv :: E.VarEnv -> Symbolic [()]
+-- Each object becomes an uninterpreted function
+convertEnv :: E.VarEnv -> Symbolic SBool
 convertEnv env =
   let
     convertBinding (n, (e, tau)) =
       case X.dim tau of
-        1 -> do
-          let f = uninterpret n :: SBV Int32 -> SWord32
-          arr <- toArr1 e
-          constrain $ \(Forall x) -> f x .== readArray arr x
-        2 -> do
-          let f = uninterpret n :: SBV (Int32, Int32) -> SWord32
-          arr <- toArr2 e
-          constrain $ \(Forall x) -> f x .== readArray arr x
+        1 ->
+          let
+            f = uninterpret n :: SBV Int32 -> SWord32
+            i = uninterpret "index_1"
+          in do
+            arr <- toArr1 e
+            return $ f i .== readArray arr i
+        2 ->
+          let
+            f = uninterpret n :: SBV (Int32, Int32) -> SWord32
+            i = uninterpret "index_2"
+          in do
+            arr <- toArr2 e
+            return $ f i .== readArray arr i
         _ -> error "higher dimensional arrays not supported"
-  in mapM convertBinding (toList env)
+  in
+    sAnd <$> mapM convertBinding (toList env)
 
 -- Treat path condition as a conjunction
 convertPathCond :: [X.Expr] -> Symbolic SBool
@@ -158,3 +164,10 @@ convertPathCond (g:gs) = do
   c2 <- convertPathCond gs
   return $ c1 .&& c2
 
+-- Yields a formula equivalent to an executed program
+convertExecutionResult :: (E.SymbolicState, X.Expr) -> Symbolic SBool
+convertExecutionResult (state, e) = do
+  env <- convertEnv (E.mu state)
+  retval <- convertExp e :: Symbolic SWord32 -- questionable
+  pathcond <- convertPathCond (E.g state)
+  return $ pathcond .=> (env .&& (sym "return_value" .== retval))

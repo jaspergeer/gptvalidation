@@ -9,7 +9,9 @@ assertProvable x =
   do
     result <- prove x
     case result of
-      ThmResult (Unsatisfiable {}) -> return ()
+      ThmResult (Unsatisfiable {}) -> do
+        print result
+        return ()
       _ -> do
         assertFailure (show result)
 
@@ -20,4 +22,6 @@ assertNotProvable x =
     case result of
       ThmResult (Unsatisfiable {}) -> do
         assertFailure (show result)
-      _ -> return ()
+      _ -> do
+        print result
+        return ()

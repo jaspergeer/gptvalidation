@@ -14,6 +14,9 @@ import Data.Foldable (foldlM)
 -- this whole module can probably be reimplemented with Reader or State
 -- but I wanted to keep it pure
 
+execute :: U.Function -> [(SymbolicState, X.Expr)]
+execute f = function (initState, f)
+
 zero :: X.Expr
 zero = X.Literal 0
 
@@ -106,7 +109,7 @@ sequence exec (s1, as) =
   in foldl (\branches a -> makeNewStarts branches a >>= exec) start as
 
 function :: SymbolicExecutor U.Function
-function (state, U.Function returnty funname params body) =
+function (state, U.Function returnty _ params body) =
   let
     state' = foldr (\(n, t) state_i -> state_i {rho = bindNewRho n (X.Free n, X.Integral t) state_i}) state params
   in

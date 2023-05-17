@@ -80,7 +80,8 @@ executable gptvalidation
                       parsec,
                       sbv,
                       containers,
-                      transformers
+                      transformers,
+                      HUnit
 
     -- Directories containing source files.
     hs-source-dirs:   app, src

@@ -4,11 +4,10 @@ import qualified AST
 import qualified SymbolicExpression as X
 import UnambiguousAST
     ( Stmt(Return, CompoundStmt), Expr(Var, ArithExpr), Function(..) )
-import SymbolicExecution ( function, initState )
-import Data.SBV ( Symbolic, EqSymbolic((.==)), SInt32, runSMT )
+import Data.SBV ( (.<=>), runSMT )
 import TestUtils (assertProvable, assertNotProvable)
-import SBVConvert (convertExp)
 import Test.HUnit (Assertion, Test (TestList, TestCase))
+import PassManager (sbvOfFunction)
 
 tests :: Test
 tests = TestList [TestCase test1, TestCase test2]
@@ -29,13 +28,10 @@ addyx =
       [ Return (ArithExpr (Var "y") AST.Add (Var "x")) ])
 
 test1 :: Assertion
-test1 = let
-  [(_, s1)] = function (initState, addxy)
-  [(_, s2)] = function (initState, addyx)
-  in do
-    sbv1 <- runSMT (convertExp s1 :: Symbolic SInt32)
-    sbv2 <- runSMT (convertExp s2 :: Symbolic SInt32)
-    assertProvable (sbv1 .== sbv2)
+test1 = do
+    sbv1 <- runSMT (sbvOfFunction addxy)
+    sbv2 <- runSMT (sbvOfFunction addyx)
+    assertProvable (sbv1 .<=> sbv2)
 
 -- Test 2
 -- Trivially non-equivalent programs
@@ -53,11 +49,7 @@ subyx =
       [ Return (ArithExpr (Var "y") AST.Sub (Var "x")) ])
 
 test2 :: Assertion
-test2 = let
-  [(_, s1)] = function (initState, subxy)
-  [(_, s2)] = function (initState, subyx)
-  in do
-    sbv1 <- runSMT (convertExp s1 :: Symbolic SInt32)
-    sbv2 <- runSMT (convertExp s2 :: Symbolic SInt32)
-    assertNotProvable (sbv1 .== sbv2)
-
+test2 = do
+    sbv1 <- runSMT (sbvOfFunction subxy)
+    sbv2 <- runSMT (sbvOfFunction subyx)
+    assertNotProvable (sbv1 .<=> sbv2)
