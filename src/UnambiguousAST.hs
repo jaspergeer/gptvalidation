@@ -7,10 +7,10 @@ type Name = String
 
 data Function = Function X.Integral Name [(Name, X.Integral)] Stmt
 
-data Expr = ArithExpr Expr AST.ArithOp Expr
+data Expr = BinExpr Expr AST.BinOp Expr
           | LogExpr Expr AST.LogOp Expr
-          | BitExpr Expr AST.BitOp Expr
           | RelExpr Expr AST.RelOp Expr
+          | ShiftExpr Expr AST.ShiftOp Expr
           | UnExpr AST.Unop Expr
           | Assign Expr Expr
           | Var Name

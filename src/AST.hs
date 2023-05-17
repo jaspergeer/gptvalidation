@@ -1,15 +1,15 @@
 module AST where
 
-data ArithOp = Add | Sub | Mul | Mod | Div deriving Show -- arithmetic
+data BinOp = Add | Sub | Mul | Mod | Div | BAnd | BOr deriving Show -- arithmetic/bitwise
 data LogOp = LAnd | LOr deriving Show -- boolean
-data BitOp = BAnd | BOr | Shl | Shr deriving Show -- bitwise
 data RelOp = Eq | Leq | Geq | Lt | Gt deriving Show -- comparison
+data ShiftOp = Shl | Shr deriving Show
 
 data Unop = Neg | LNot | BNot deriving Show
 
-data Expr = ArithExpr Expr ArithOp Expr
+data Expr = BinExpr Expr BinOp Expr
           | LogExpr Expr LogOp Expr
-          | BitExpr Expr BitOp Expr
+          | ShiftOp Expr ShiftOp Expr
           | RelExpr Expr RelOp Expr
           | UnExpr Unop Expr
           | AssignExpr Expr Expr

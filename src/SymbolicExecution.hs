@@ -1,4 +1,3 @@
-{-# LANGUAGE InstanceSigs #-}
 module SymbolicExecution where
 
 import Prelude hiding (sequence, exp)
@@ -34,7 +33,6 @@ data SymExException = NotBound Name Name
                     | Unsupported String
 
 instance Show SymExException where
-  show :: SymExException -> String
   show ex = "Symbolic Executor: " ++ case ex of
     NotBound x env -> "name " ++ x ++ " not bound in environment " ++ env
     NotPointer x -> "name " ++ x ++ " is not bound to a pointer"
@@ -148,15 +146,15 @@ stmt (state, c) = case c of
 
 toOffset :: X.Expr -> X.Expr
 toOffset s = case s of
-  X.PtrTo _ -> X.ArithExpr s AST.Add zero
-  X.ArithExpr s1 AST.Add s2 -> case
+  X.PtrTo _ -> X.BinExpr s AST.Add zero
+  X.BinExpr s1 AST.Add s2 -> case
     (toOffset s1, toOffset s2) of
-      (X.ArithExpr s3@(X.PtrTo _) AST.Add s4, s2') -> X.ArithExpr s3 AST.Add (X.ArithExpr s4 AST.Add s2')
-      (s1', X.ArithExpr s3@(X.PtrTo _) AST.Add s4) -> X.ArithExpr s3 AST.Add (X.ArithExpr s1' AST.Add s4)
+      (X.BinExpr s3@(X.PtrTo _) AST.Add s4, s2') -> X.BinExpr s3 AST.Add (X.BinExpr s4 AST.Add s2')
+      (s1', X.BinExpr s3@(X.PtrTo _) AST.Add s4) -> X.BinExpr s3 AST.Add (X.BinExpr s1' AST.Add s4)
       _ -> s
-  X.ArithExpr s1 AST.Sub s2 -> case
+  X.BinExpr s1 AST.Sub s2 -> case
     toOffset s1 of
-      X.ArithExpr s3@(X.PtrTo _) AST.Add s4 -> X.ArithExpr s3 AST.Add (X.ArithExpr s4 AST.Sub s2)
+      X.BinExpr s3@(X.PtrTo _) AST.Add s4 -> X.BinExpr s3 AST.Add (X.BinExpr s4 AST.Sub s2)
       _ -> s
   _ -> s
 
@@ -178,18 +176,18 @@ updAtAddr addr indices newval state =
 
 exp :: SymbolicExecutor U.Expr
 exp (state, e) = case e of
-  U.ArithExpr e_1 op e_2 -> do
+  U.BinExpr e_1 op e_2 -> do
     (state_1 , s_1) <- exp (state, e_1)
     (state_2, s_2) <- exp (state_1, e_2)
-    return (state_2, X.ArithExpr s_1 op s_2)
+    return (state_2, X.BinExpr s_1 op s_2)
   U.LogExpr e_1 op e_2 -> do
     (state_1 , s_1) <- exp (state, e_1)
     (state_2, s_2) <- exp (state_1, e_2)
     return (state_2, X.LogExpr s_1 op s_2)
-  U.BitExpr e_1 op e_2 -> do
+  U.ShiftExpr e_1 op e_2 -> do
     (state_1 , s_1) <- exp (state, e_1)
     (state_2, s_2) <- exp (state_1, e_2)
-    return (state_2, X.BitExpr s_1 op s_2)
+    return (state_2, X.ShiftExpr s_1 op s_2)
   U.RelExpr e_1 op e_2 -> do
     (state_1 , s_1) <- exp (state, e_1)
     (state_2, s_2) <- exp (state_1, e_2)
@@ -211,14 +209,14 @@ exp (state, e) = case e of
     (state_1, s_1) <- exp (state, e_1)
     (state_2, s_2) <- exp (state_1, e_2)
     case toOffset s_1 of
-      X.ArithExpr (X.PtrTo a) AST.Add i ->
+      X.BinExpr (X.PtrTo a) AST.Add i ->
         return (updAtAddr a [i] s_2 state_2, s_2)
       _ -> throw UnknownAlias
   U.Assign {} -> throw (Unsupported "assignment with complex left-hand side")
   U.Deref e_1 -> do
     (state', s) <- exp (state, e_1)
     case toOffset s of
-      X.ArithExpr (X.PtrTo a) AST.Add s_1 -> do
+      X.BinExpr (X.PtrTo a) AST.Add s_1 -> do
         let (getenv, envname) = if rho state' `E.binds` a then (rho, "rho") else (mu, "mu")
         let t = X.base (typeIn getenv envname a state')
         return (state', X.FromType t (X.Sel (valIn getenv envname a state') [s_1]))

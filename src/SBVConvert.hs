@@ -6,9 +6,36 @@ import qualified AST
 import qualified SymbolicExecution as E
 import qualified SymbolicExpression as X
 import Data.SBV
+    ( Int32,
+      newArray_,
+      (.&&),
+      (.=>),
+      (.||),
+      sAnd,
+      sTrue,
+      oneIf,
+      sFromIntegral,
+      sShiftLeft,
+      Bits(complement, (.&.), (.|.)),
+      EqSymbolic((.==), (./=)),
+      SArray,
+      SBV,
+      SBool,
+      SInt32,
+      SInt8,
+      SWord32,
+      SymArray(readArray, writeArray),
+      SymVal,
+      HasKind,
+      OrdSymbolic((.>), (.<=), (.>=), (.<)),
+      SDivisible(sMod, sDiv),
+      SFiniteBits,
+      SIntegral,
+      SMTDefinable(sym, uninterpret),
+      Symbolic, sShiftRight )
 import Data.SBV.Tuple ( tuple )
 import Data.Map (toList)
-import Control.Exception
+import Control.Exception ( Exception, throw )
 
 data SBVConvertException = UnsupportedTupleDim Int
 
@@ -66,7 +93,7 @@ convertExp e = case e of
         arr <- toArr2 e1
         return $ readArray arr (tuple2 xs)
       _ -> throw (UnsupportedTupleDim (length es))
-  X.ArithExpr e1 binop e2 ->
+  X.BinExpr e1 binop e2 ->
     let
       convertArith op = case op of
         AST.Add -> (+)
@@ -74,6 +101,8 @@ convertExp e = case e of
         AST.Mul -> (*)
         AST.Div -> sDiv
         AST.Mod -> sMod
+        AST.BAnd -> (.&.)
+        AST.BOr -> (.|.)
     in
       do
         s1 <- convertExp e1
@@ -90,17 +119,15 @@ convertExp e = case e of
       s2 <- convertExp e2 :: Symbolic SInt32
       let b2 = s2 ./= 0
       return $ oneIf (convertLog binop b1 b2)
-  X.BitExpr e1 binop e2 ->
+  X.ShiftExpr e1 binop e2 ->
     let
-      convertBit op = case op of
-        AST.BAnd -> (.&.)
-        AST.BOr -> (.|.)
+      convertShift op = case op of
         AST.Shl -> sShiftLeft
-        AST.Shr -> sSignedShiftArithRight
+        AST.Shr -> sShiftRight -- C99 "implementation-defined"
     in do
       s1 <- convertExp e1
-      s2 <- convertExp e2
-      return $ convertBit binop s1 s2
+      s2 <- convertExp e2 :: Symbolic SWord32
+      return $ convertShift binop s1 s2
   X.RelExpr e1 binop e2 ->
     let
       convertRel op = case op of

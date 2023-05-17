@@ -2,6 +2,7 @@
 
 module TestUtils where
 import Data.SBV
+    ( prove, SMTResult(Unsatisfiable), Provable, ThmResult(ThmResult) )
 import Test.HUnit (assertFailure, Assertion)
 
 assertProvable :: (Provable a) => a -> Assertion
@@ -10,6 +11,7 @@ assertProvable x =
     result <- prove x
     case result of
       ThmResult (Unsatisfiable {}) -> do
+        -- print result
         return ()
       _ -> do
         assertFailure (show result)
@@ -22,4 +24,5 @@ assertNotProvable x =
       ThmResult (Unsatisfiable {}) -> do
         assertFailure (show result)
       _ -> do
+        -- print result
         return ()

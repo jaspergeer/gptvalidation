@@ -12,10 +12,10 @@ type Name = String
 
 -- Perhaps array forms should be a seperate type
 
-data Expr = ArithExpr Expr AST.ArithOp Expr
+data Expr = BinExpr Expr AST.BinOp Expr
           | LogExpr Expr AST.LogOp Expr
-          | BitExpr Expr AST.BitOp Expr
           | RelExpr Expr AST.RelOp Expr
+          | ShiftExpr Expr AST.ShiftOp Expr
           | UnExpr AST.Unop Expr
           | Sel Expr [Expr]
           | Upd Expr [Expr] Expr
