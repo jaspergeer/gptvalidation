@@ -8,8 +8,14 @@ import qualified SymbolicExpression as X
 import Data.SBV
 import Data.SBV.Tuple ( tuple )
 import Data.Map (toList)
+import Control.Exception
 
--- data SBVConvertException = 
+data SBVConvertException = UnsupportedTupleDim Int
+
+instance Show SBVConvertException where
+  show ex = "SBV Conversion: " ++ case ex of
+    UnsupportedTupleDim i -> "tuples of dimension " ++ show i ++ " not supported"
+instance Exception SBVConvertException
 
 -- Array helpers
 toArrN :: (SFiniteBits a, SDivisible (SBV a), SIntegral a, SymVal a, HasKind tup) => ([SBV Int32] -> SBV tup) -> X.Expr -> Symbolic (SArray tup a)
@@ -20,7 +26,7 @@ toArrN tupleN e = case e of
     is <- tupleN <$> mapM convertExp es
     val <- convertExp e2
     return $ writeArray arr is val
-  _ -> error "tried to interpret non-array value as array"
+  _ -> error "IMPOSSIBLE: non-array value encountered as array"
 
 tuple1 :: [SBV a] -> SBV a
 tuple1 [a] = a
@@ -39,16 +45,16 @@ toArr2 = toArrN tuple2
 -- Non-array symbolic expressions become SBV expressions
 convertExp :: (SFiniteBits a, SDivisible (SBV a), SIntegral a, SymVal a, Num a, Ord a) => X.Expr -> Symbolic (SBV a)
 convertExp e = case e of
-  X.Literal i -> free $ show i
+  X.Literal i -> return (fromInteger i)
   X.FromType t e1 -> case t of   
     X.Int32 -> do
-      s <- convertExp e1 :: Symbolic (SBV Int32)
+      s <- convertExp e1 :: Symbolic SInt32
       return $ sFromIntegral s
     X.Int8 -> do
-      s <- convertExp e1 :: Symbolic (SBV Int8)
+      s <- convertExp e1 :: Symbolic SInt8
       return $ sFromIntegral s
     _ -> do -- Ptr, U32
-      s <- convertExp e1 :: Symbolic (SBV Word32)
+      s <- convertExp e1 :: Symbolic SWord32
       return $ sFromIntegral s
   X.Sel e1 es -> do
     xs <- mapM convertExp es
@@ -59,7 +65,7 @@ convertExp e = case e of
       [_, _] -> do
         arr <- toArr2 e1
         return $ readArray arr (tuple2 xs)
-      _ -> error "higher dimensional arrays not supported"
+      _ -> throw (UnsupportedTupleDim (length es))
   X.ArithExpr e1 binop e2 ->
     let
       convertArith op = case op of
@@ -127,9 +133,9 @@ convertExp e = case e of
       [_, _] -> do
         let f = uninterpret funname
         return $ f (tuple2 xs)
-      _ -> error ("functions of " ++ show (length args) ++ " arguments not supported")
-  X.NewArr {} -> error "array encountered as value"
-  X.Upd {} -> error "array encountered as value"
+      _ -> throw (UnsupportedTupleDim (length args))
+  X.NewArr {} -> error "IMPOSSIBLE: array encountered as value"
+  X.Upd {} -> error "IMPOSSIBLE: array encountered as value"
   _ -> error "TODO"
 
 -- Each object becomes an uninterpreted function
@@ -152,7 +158,7 @@ convertEnv env =
           in do
             arr <- toArr2 e
             return $ f i .== readArray arr i
-        _ -> error "higher dimensional arrays not supported"
+        i -> throw (UnsupportedTupleDim i)
   in
     sAnd <$> mapM convertBinding (toList env)
 

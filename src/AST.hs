@@ -1,11 +1,11 @@
 module AST where
 
-data ArithOp = Add | Sub | Mul | Mod | Div -- arithmetic
-data LogOp = LAnd | LOr -- boolean
-data BitOp = BAnd | BOr | Shl | Shr -- bitwise
-data RelOp = Eq | Leq | Geq | Lt | Gt -- comparison
+data ArithOp = Add | Sub | Mul | Mod | Div deriving Show -- arithmetic
+data LogOp = LAnd | LOr deriving Show -- boolean
+data BitOp = BAnd | BOr | Shl | Shr deriving Show -- bitwise
+data RelOp = Eq | Leq | Geq | Lt | Gt deriving Show -- comparison
 
-data Unop = Neg | LNot | BNot
+data Unop = Neg | LNot | BNot deriving Show
 
 data Expr = ArithExpr Expr ArithOp Expr
           | LogExpr Expr LogOp Expr
@@ -20,6 +20,7 @@ data Expr = ArithExpr Expr ArithOp Expr
           | Char Char
           | Index Name [Expr]
           | Deref Expr
+          deriving Show
 
 type Name = String
 
@@ -32,3 +33,4 @@ data Stmt = CompoundStmt [Stmt]
           -- | While Expr [Stmt]
           -- | For Stmt Expr Stmt [Stmt]
           | Return Expr
+          deriving Show

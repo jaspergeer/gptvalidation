@@ -135,13 +135,13 @@ stmt (state, c) = case c of
     let
       tau = X.Complex t
       state' = state { rho = bindNewRho a (X.NewArr (X.dim tau) (X.base tau), tau) state }
-      state'' = state' { rho = bindNewRho x (X.PtrTo a, X.Integral (X.Ptr tau)) state}
+      state'' = state' { rho = bindNewRho x (X.PtrTo a, X.Integral (X.Ptr tau)) state' }
     in return (state'', zero)
   U.DeclareHeapObj t x a ->
     let
       tau = X.Complex t
       state' = state { mu = bindNewMu a (X.NewArr (X.dim tau) (X.base tau), tau) state }
-      state'' = state' { rho = bindNewRho x (X.PtrTo a, X.Integral (X.Ptr tau)) state}
+      state'' = state' { rho = bindNewRho x (X.PtrTo a, X.Integral (X.Ptr tau)) state' }
     in return (state'', zero)
   U.Return e -> exp (state, e)
   _ -> throw (Unsupported "loops")
@@ -225,12 +225,16 @@ exp (state, e) = case e of
       _ -> throw UnknownAlias
   U.Var x -> case typeInRho x state of
       X.Integral t -> return (state, X.FromType t (valInRho x state))
-      _ -> error "IMPOSSIBLE: stack object referenced by name"
-  U.Index x es -> do
-    (state_n1, is) <- many state exp es
-    let (getenv, envname) = if rho state `E.binds` x then (rho, "rho") else (mu, "mu")
-    let t = X.base (typeIn getenv envname x state_n1)
-    return (state, X.FromType t (X.Sel (valIn getenv envname x state_n1) is))
+      _ -> throw (Unsupported "memory objects referenced directly")
+  U.Index x es ->
+    let ptr = valInRho x state in
+    case ptr of
+      X.PtrTo addr ->  do
+        let (getenv, envname) = if rho state `E.binds` addr then (rho, "rho") else (mu, "mu")
+        (state_n1, is) <- many state exp es
+        let t = X.base (typeIn getenv envname addr state_n1)
+        return (state, X.FromType t (X.Sel (valIn getenv envname addr state_n1) is))
+      _ -> throw (NotPointer x)
   U.Int i -> return (state, X.Literal i)
   U.Char c -> return (state, X.Literal (toInteger (fromEnum c)))
   U.FunCall f es -> do

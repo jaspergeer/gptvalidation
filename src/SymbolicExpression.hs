@@ -26,11 +26,12 @@ data Expr = ArithExpr Expr AST.ArithOp Expr
           | FromType Integral Expr
           | PtrTo Name
           | Free Name
+          deriving Show
 
-data Integral = Int32 | Int8 | U32 | Ptr Type
-data Complex = Arr Int Integral | Fun [Kind] Kind
+data Integral = Int32 | Int8 | U32 | Ptr Type deriving Show
+data Complex = Arr Int Integral | Fun [Kind] Kind deriving Show
 
-data Type = Integral Integral | Complex Complex
+data Type = Integral Integral | Complex Complex deriving Show
 
 dim :: Type -> Int
 dim tau = case tau of
