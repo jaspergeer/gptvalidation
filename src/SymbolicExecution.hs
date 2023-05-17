@@ -30,7 +30,7 @@ data SymExException = NotBound Name Name
                     | Unsupported String
 
 instance Show SymExException where
-  show ex = case ex of
+  show ex = "Symbolic Executor: " ++ case ex of
     NotBound x env -> "name " ++ x ++ " not bound in environment " ++ env
     NotPointer x -> "name " ++ x ++ " is not bound to a pointer"
     AlreadyBound x env -> "name " ++ x ++ " already bound in environemnt " ++ env
@@ -54,7 +54,7 @@ typeInMu = typeIn mu "mu"
 
 valIn :: (SymbolicState -> VarEnv) -> Name -> (Name -> SymbolicState -> X.Expr)
 valIn getenv envname x state = case E.find x (getenv state) of
-  Just (s, _) -> X.FromType (typeIn getenv envname x state) s
+  Just (s, _) -> s
   _ -> throw (NotBound x envname)
 
 valInRho :: Name -> SymbolicState -> X.Expr
@@ -113,18 +113,18 @@ stmt (state, c) = case c of
     r2 <- stmt (state_2, c2)
     [r1, r2]
   U.DeclareStack b x ->
-    return (state { rho = bindNewRho x (zero, X.Base b) state}, zero)
+    return (state { rho = bindNewRho x (zero, X.Integral b) state}, zero)
   U.DeclareStackObj t x a ->
     let
-      tau = X.Generic t
+      tau = X.Complex t
       state' = state { rho = bindNewRho a (X.NewArr (X.dim tau) (X.base tau), tau) state }
-      state'' = state' { rho = bindNewRho x (X.PtrTo a, X.Generic (X.Ptr tau)) state}
+      state'' = state' { rho = bindNewRho x (X.PtrTo a, X.Integral (X.Ptr tau)) state}
     in return (state'', zero)
   U.DeclareHeapObj t x a ->
     let
-      tau = X.Generic t
+      tau = X.Complex t
       state' = state { mu = bindNewMu a (X.NewArr (X.dim tau) (X.base tau), tau) state }
-      state'' = state' { rho = bindNewRho x (X.PtrTo a, X.Generic (X.Ptr tau)) state}
+      state'' = state' { rho = bindNewRho x (X.PtrTo a, X.Integral (X.Ptr tau)) state}
     in return (state'', zero)
   U.Return e -> exp (state, e)
   _ -> throw (Unsupported "loops")
@@ -200,20 +200,20 @@ exp (state, e) = case e of
   U.Assign {} -> throw (Unsupported "assignment with complex left-hand side")
   U.Deref e_1 -> do
     (state', s) <- exp (state, e_1)
-    case s of
-      X.ArithExpr (X.PtrTo a) AST.Add s_1 ->
-        if rho state' `E.binds` a then
-          return (state', X.Sel (valInRho a state') [s_1])
-        else
-          return (state', X.Sel (valInMu a state') [s_1])
+    case toOffset s of
+      X.ArithExpr (X.PtrTo a) AST.Add s_1 -> do
+        let (getenv, envname) = if rho state' `E.binds` a then (rho, "rho") else (mu, "mu")
+        let t = X.base (typeIn getenv envname a state')
+        return (state', X.FromType t (X.Sel (valIn getenv envname a state') [s_1]))
       _ -> throw UnknownAlias
-  U.Var x -> return (state, valInRho x state)
+  U.Var x -> case typeInRho x state of
+      X.Integral t -> return (state, X.FromType t (valInRho x state))
+      _ -> error "IMPOSSIBLE: stack object referenced by name"
   U.Index x es -> do
     (state_n1, is) <- many state exp es
-    if rho state `E.binds` x then
-      return (state, X.Sel (valInRho x state_n1) is)
-    else
-      return (state, X.Sel (valInMu x state_n1) is)
+    let (getenv, envname) = if rho state `E.binds` x then (rho, "rho") else (mu, "mu")
+    let t = X.base (typeIn getenv envname x state_n1)
+    return (state, X.FromType t (X.Sel (valIn getenv envname x state_n1) is))
   U.Int i -> return (state, X.Literal i)
   U.Char c -> return (state, X.Literal (toInteger (fromEnum c)))
   U.FunCall f es -> do

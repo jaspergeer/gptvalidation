@@ -1,6 +1,6 @@
 module UnambiguousAST where
 
-import qualified SymbolicExpression as SX
+import qualified SymbolicExpression as X
 import qualified AST
 
 type Name = String
@@ -21,9 +21,9 @@ data Expr = ArithExpr Expr AST.ArithOp Expr
 data Stmt = CompoundStmt [Stmt]
           | Expr Expr
           | IfElse Expr Stmt Stmt
-          | DeclareHeapObj SX.Generic Name Name
-          | DeclareStack SX.Base Name
-          | DeclareStackObj SX.Generic Name Name
+          | DeclareHeapObj X.Complex Name Name
+          | DeclareStack X.Integral Name
+          | DeclareStackObj X.Complex Name Name
           | While Expr [Stmt]
           | For Stmt Expr Stmt [Stmt]
           | Return Expr

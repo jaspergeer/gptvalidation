@@ -2,6 +2,7 @@ module SymbolicExpression where
 
 import qualified AST
 import Data.SBV.Dynamic
+import Prelude hiding (Integral)
 
 type Name = String
 
@@ -19,24 +20,23 @@ data Expr = ArithExpr Expr AST.ArithOp Expr
           | FunCall Name [Expr]
           | Choice Expr Expr Expr
           | Literal Integer
-          | NewArr Int Base
-          | FromType Type Expr
+          | NewArr Int Integral
+          | FromType Integral Expr
           | PtrTo Name
 
-data Base = Int32 | Int8 | U32
-data Generic = Ptr Type | Arr Int Base | Fun [Kind] Kind
+data Integral = Int32 | Int8 | U32 | Ptr Type
+data Complex = Arr Int Integral | Fun [Kind] Kind
 
-data Type = Generic Generic | Base Base
+data Type = Integral Integral | Complex Complex
 
 dim :: Type -> Int
 dim tau = case tau of
-  Base _ -> 0
-  Generic (Arr i _) -> i
-  Generic (Ptr tau') -> 1 + dim tau'
-  Generic (Fun {}) -> error "dim of function"
+  Integral _ -> 0
+  Complex (Arr i _) -> i
+  Complex (Fun {}) -> error "IMPOSSIBLE: compute dim of function"
 
-base :: Type -> Base
+base :: Type -> Integral
 base tau = case tau of
-  (Base b) -> b
-  (Generic (Ptr tau')) -> base tau'
-  _ -> error "TODO"
+  Integral t -> t
+  Complex (Arr _ t) -> t
+  _ -> error "IMPOSSIBLE: compute base of function"

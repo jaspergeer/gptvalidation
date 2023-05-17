@@ -35,20 +35,20 @@ toArr1 = toArrN tuple1
 toArr2 :: (SFiniteBits b, SIntegral b, SymVal b, SDivisible (SBV b)) => X.Expr -> Symbolic (SArray (Int32, Int32) b)
 toArr2 = toArrN tuple2
 
+-- Non-array symbolic expressions become SBV expressions
 convertExp :: (SFiniteBits a, SDivisible (SBV a), SIntegral a, SymVal a, Num a, Ord a) => X.Expr -> Symbolic (SBV a)
 convertExp e = case e of
   X.Literal i -> free $ show i
-  X.FromType tau e1 -> case tau of
-    X.Generic (X.Ptr _) -> do
+  X.FromType t e1 -> case t of
+    (X.Ptr _) -> do
       s <- convertExp e1 :: Symbolic (SBV Word32)
       return $ sFromIntegral s
-    X.Base X.Int32 -> do
+    X.Int32 -> do
       s <- convertExp e1 :: Symbolic (SBV Int32)
       return $ sFromIntegral s
-    X.Base X.Int8 -> do
+    X.Int8 -> do
       s <- convertExp e1 :: Symbolic (SBV Int8)
       return $ sFromIntegral s
-    _ -> error "tried to enforce non-integral type"
   X.Sel e1 es -> do
     x <- mapM convertExp es
     case es of
@@ -115,7 +115,7 @@ convertExp e = case e of
         return $ oneIf (s1 .== 0)
       AST.BNot ->
         return $ complement s1
-  X.PtrTo n -> return $ sym ("_ptrto_" ++ n)
+  X.PtrTo n -> return $ sym ("*" ++ n)
   X.NewArr {} -> error "array encountered as value"
   X.Upd {} -> error "array encountered as value"
   _ -> error "TODO"
@@ -129,11 +129,11 @@ convertEnv env =
         1 -> do
           let f = uninterpret n :: SBV Int32 -> SWord32
           arr <- toArr1 e
-          constrain $ \(Forall x) -> readArray arr x .== f x
+          constrain $ \(Forall x) -> f x .== readArray arr x
         2 -> do
           let f = uninterpret n :: SBV (Int32, Int32) -> SWord32
           arr <- toArr2 e
-          constrain $ \(Forall x) -> readArray arr x .== f x
-        _ -> error ""
+          constrain $ \(Forall x) -> f x .== readArray arr x
+        _ -> error "higher dimensional arrays not supported"
   in mapM convertBinding (toList env)
 
