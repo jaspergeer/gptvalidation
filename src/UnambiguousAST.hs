@@ -5,6 +5,8 @@ import qualified AST
 
 type Name = String
 
+data Function = Function X.Integral Name [(Name, X.Integral)] Stmt
+
 data Expr = ArithExpr Expr AST.ArithOp Expr
           | LogExpr Expr AST.LogOp Expr
           | BitExpr Expr AST.BitOp Expr

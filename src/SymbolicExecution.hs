@@ -1,3 +1,4 @@
+{-# LANGUAGE InstanceSigs #-}
 module SymbolicExecution where
 
 import Prelude hiding (sequence, exp)
@@ -30,6 +31,7 @@ data SymExException = NotBound Name Name
                     | Unsupported String
 
 instance Show SymExException where
+  show :: SymExException -> String
   show ex = "Symbolic Executor: " ++ case ex of
     NotBound x env -> "name " ++ x ++ " not bound in environment " ++ env
     NotPointer x -> "name " ++ x ++ " is not bound to a pointer"
@@ -64,7 +66,7 @@ valInMu :: Name -> SymbolicState -> X.Expr
 valInMu = valIn mu "mu"
 
 bindIn :: (SymbolicState -> VarEnv) -> Name -> (Name -> X.Expr -> SymbolicState -> VarEnv)
-bindIn getenv envname x e state = 
+bindIn getenv envname x e state =
   let env' = getenv state
       tau = typeIn getenv envname x state in
       E.bind x (e, tau) env'
@@ -76,7 +78,7 @@ bindInMu :: Name -> X.Expr -> SymbolicState -> E.Env (X.Expr, X.Type)
 bindInMu = bindIn mu "mu"
 
 bindNew :: (SymbolicState -> VarEnv) -> Name -> (Name -> (X.Expr, X.Type) -> SymbolicState -> E.Env (X.Expr, X.Type))
-bindNew getenv envname x y state = 
+bindNew getenv envname x y state =
   let env' = getenv state in
     if env' `E.binds` x then throw (AlreadyBound x envname)
     else E.bind x y env'
@@ -88,7 +90,10 @@ bindNewMu :: Name -> (X.Expr, X.Type) -> SymbolicState -> E.Env (X.Expr, X.Type)
 bindNewMu = bindNew mu "mu"
 
 -- symbolic state: {g, rho, mu}
-data SymbolicState = SymbolicState { g :: X.Expr, rho :: VarEnv, mu :: VarEnv }
+data SymbolicState = SymbolicState { g :: [X.Expr], rho :: VarEnv, mu :: VarEnv }
+
+initState :: SymbolicState
+initState = SymbolicState { g = [], rho = E.empty, mu = E.empty }
 
 -- symbolic execution with branches
 type SymbolicExecutor a = (SymbolicState, a) -> [(SymbolicState, X.Expr)]
@@ -100,15 +105,24 @@ sequence exec (s1, as) =
     makeNewStarts branches a = foldr (\(state, _) starts -> (state, a) : starts) [] branches
   in foldl (\branches a -> makeNewStarts branches a >>= exec) start as
 
+function :: SymbolicExecutor U.Function
+function (state, U.Function returnty funname params body) =
+  let
+    state' = foldr (\(n, t) state_i -> state_i {rho = bindNewRho n (X.Free n, X.Integral t) state_i}) state params
+  in
+    do
+      (state'', s) <- stmt (state', body)
+      return (state'', X.FromType returnty s)
+
 stmt :: SymbolicExecutor U.Stmt
 stmt (state, c) = case c of
   U.CompoundStmt cs -> sequence stmt (state, cs)
   U.Expr e -> (\(s', _) -> (s', zero)) <$> exp (state, e)
   U.IfElse e c1 c2 -> do
     (state', g1) <- exp (state, e)
-    let state_1 = state' {g = X.LogExpr (g state') AST.LAnd g1}
+    let state_1 = state' { g = g1 : g state' }
     let notg1 = X.UnExpr AST.LNot g1
-    let state_2 = state' {g = X.LogExpr (g state') AST.LAnd notg1}
+    let state_2 = state' { g = notg1 : g state' }
     r1 <- stmt (state_1, c1)
     r2 <- stmt (state_2, c2)
     [r1, r2]

@@ -10,6 +10,8 @@ type Name = String
 
 -- Upd should never appear except as a subexpression of Sel
 
+-- Perhaps array forms should be a seperate type
+
 data Expr = ArithExpr Expr AST.ArithOp Expr
           | LogExpr Expr AST.LogOp Expr
           | BitExpr Expr AST.BitOp Expr
@@ -23,6 +25,7 @@ data Expr = ArithExpr Expr AST.ArithOp Expr
           | NewArr Int Integral
           | FromType Integral Expr
           | PtrTo Name
+          | Free Name
 
 data Integral = Int32 | Int8 | U32 | Ptr Type
 data Complex = Arr Int Integral | Fun [Kind] Kind
