@@ -1,2 +1,2 @@
 # tinyvalidator
-C-subset symbolic executor for small research project. More info TBD.
+C-subset symbolic executor for small research project. Built to validate program improvements performed by LLMs. WIP
