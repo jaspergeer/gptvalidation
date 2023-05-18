@@ -5,6 +5,7 @@ module SBVConvert where
 import qualified AST
 import qualified SymbolicExecution as E
 import qualified SymbolicExpression as X
+import qualified Types as T
 import Data.SBV
     ( Int32,
       newArray_,
@@ -32,7 +33,7 @@ import Data.SBV
       SFiniteBits,
       SIntegral,
       SMTDefinable(sym, uninterpret),
-      Symbolic, sShiftRight )
+      Symbolic, sShiftRight, (.^.) )
 import Data.SBV.Tuple ( tuple )
 import Data.Map (toList)
 import Control.Exception ( Exception, throw )
@@ -74,10 +75,10 @@ convertExp :: (SFiniteBits a, SDivisible (SBV a), SIntegral a, SymVal a, Num a, 
 convertExp e = case e of
   X.Literal i -> return (fromInteger i)
   X.FromType t e1 -> case t of   
-    X.Int32 -> do
+    T.Int32 -> do
       s <- convertExp e1 :: Symbolic SInt32
       return $ sFromIntegral s
-    X.Int8 -> do
+    T.Int8 -> do
       s <- convertExp e1 :: Symbolic SInt8
       return $ sFromIntegral s
     _ -> do -- Ptr, U32
@@ -103,6 +104,7 @@ convertExp e = case e of
         AST.Mod -> sMod
         AST.BAnd -> (.&.)
         AST.BOr -> (.|.)
+        AST.BXor -> (.^.)
     in
       do
         s1 <- convertExp e1
@@ -136,6 +138,7 @@ convertExp e = case e of
         AST.Geq -> (.>=)
         AST.Lt -> (.<)
         AST.Gt -> (.>)
+        AST.Neq -> (./=)
     in do
       s1 <- convertExp e1 :: Symbolic SInt32
       s2 <- convertExp e2 :: Symbolic SInt32
@@ -170,7 +173,7 @@ convertEnv :: E.VarEnv -> Symbolic SBool
 convertEnv env =
   let
     convertBinding (n, (e, tau)) =
-      case X.dim tau of
+      case T.dim tau of
         1 ->
           let
             f = uninterpret n :: SBV Int32 -> SWord32

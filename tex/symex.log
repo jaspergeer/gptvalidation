@@ -1,10 +1,10 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.24 (TeX Live 2022/Homebrew) (preloaded format=pdflatex 2023.1.13)  14 APR 2023 16:44
+This is pdfTeX, Version 3.141592653-2.6-1.40.24 (TeX Live 2022/Homebrew) (preloaded format=pdflatex 2023.1.13)  17 MAY 2023 22:32
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
  %&-line parsing enabled.
-**/Users/jasper/git/gptvalidation/tex/symex.tex
-(/Users/jasper/git/gptvalidation/tex/symex.tex
+**/Users/jasper/git/tinyvalidator/tex/symex.tex
+(/Users/jasper/git/tinyvalidator/tex/symex.tex
 LaTeX2e <2021-11-15> patch level 1
 L3 programming layer <2022-02-24> (/usr/local/Cellar/texlive/20220321_4/share/texmf-dist/tex/latex/base/article.cls
 Document Class: article 2021/10/04 v1.4n Standard LaTeX document class
@@ -267,7 +267,7 @@ Here is how much of TeX's memory you used:
  1141 hyphenation exceptions out of 8191
  55i,18n,62p,257b,295s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/Cellar/texlive/20220321_4/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local/Cellar/texlive/20220321_4/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb></usr/local/Cellar/texlive/20220321_4/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/Cellar/texlive/20220321_4/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/Cellar/texlive/20220321_4/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/Cellar/texlive/20220321_4/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/Cellar/texlive/20220321_4/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/Cellar/texlive/20220321_4/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/Cellar/texlive/20220321_4/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb>
-Output written on symex.pdf (5 pages, 117547 bytes).
+Output written on symex.pdf (5 pages, 117689 bytes).
 PDF statistics:
  65 PDF objects out of 1000 (max. 8388607)
  39 compressed objects within 1 object stream

@@ -92,11 +92,11 @@
 <bitwise-and-expression> ::= <equality-expression>
   \alt <and-expression> "&" <equality-expression>
 
-<exclusive-or-expression> ::= <and-expression>
-  \alt <exclusive-or-expression> "|" <exclusive-or-expression>
+<exclusive-or-expression> ::= <bitwise-and-expression>
+  \alt <exclusive-or-expression> "^" <bitwise-and-expression>
 
 <bitwise-or-expression> ::= <exclusive-or-expression>
-  \alt <inclusive-or-expression> "|" <exclusive-or-expression>
+  \alt <bitwise-or-expression> "|" <exclusive-or-expression>
 
 <logical-and-expression> ::= <bitwise-or-expression>
   \alt <logical-and-expression> "&&" <bitwise-or-expression>

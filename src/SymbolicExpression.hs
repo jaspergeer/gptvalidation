@@ -1,8 +1,8 @@
 module SymbolicExpression where
 
 import qualified AST
-import Data.SBV.Dynamic
 import Prelude hiding (Integral)
+import qualified Types as T
 
 type Name = String
 
@@ -22,25 +22,8 @@ data Expr = BinExpr Expr AST.BinOp Expr
           | FunCall Name [Expr]
           | Choice Expr Expr Expr
           | Literal Integer
-          | NewArr Int Integral
-          | FromType Integral Expr
+          | NewArr Int T.Integral
+          | FromType T.Integral Expr
           | PtrTo Name
           | Free Name
           deriving Show
-
-data Integral = Int32 | Int8 | U32 | Ptr Type deriving Show
-data Complex = Arr Int Integral | Fun [Kind] Kind deriving Show
-
-data Type = Integral Integral | Complex Complex deriving Show
-
-dim :: Type -> Int
-dim tau = case tau of
-  Integral _ -> 0
-  Complex (Arr i _) -> i
-  Complex (Fun {}) -> error "IMPOSSIBLE: compute dim of function"
-
-base :: Type -> Integral
-base tau = case tau of
-  Integral t -> t
-  Complex (Arr _ t) -> t
-  _ -> error "IMPOSSIBLE: compute base of function"

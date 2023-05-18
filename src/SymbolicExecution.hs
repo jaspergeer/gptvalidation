@@ -5,7 +5,7 @@ import Prelude hiding (sequence, exp)
 import qualified SymbolicExpression as X
 import qualified Env as E
 import qualified UnambiguousAST as U
-
+import qualified Types as T
 import qualified AST
 import Control.Exception (throw, Exception)
 import Data.Foldable (foldlM)
@@ -24,7 +24,7 @@ void s = [(s, zero)]
 
 type Name = String
 
-type VarEnv = E.Env (X.Expr, X.Type)
+type VarEnv = E.Env (X.Expr, T.Type)
 
 data SymExException = NotBound Name Name
                     | NotPointer Name
@@ -44,15 +44,15 @@ instance Exception SymExException
 
 -- helper functions for interacting with environments
 
-typeIn :: (SymbolicState -> VarEnv) -> Name -> (Name -> SymbolicState -> X.Type)
+typeIn :: (SymbolicState -> VarEnv) -> Name -> (Name -> SymbolicState -> T.Type)
 typeIn getenv envname x state = case E.find x (getenv state) of
   Just (_, tau) -> tau
   _ -> throw (NotBound x envname)
 
-typeInRho :: E.Name -> SymbolicState -> X.Type
+typeInRho :: E.Name -> SymbolicState -> T.Type
 typeInRho = typeIn rho "rho"
 
-typeInMu :: E.Name -> SymbolicState -> X.Type
+typeInMu :: E.Name -> SymbolicState -> T.Type
 typeInMu = typeIn mu "mu"
 
 valIn :: (SymbolicState -> VarEnv) -> Name -> (Name -> SymbolicState -> X.Expr)
@@ -72,22 +72,22 @@ bindIn getenv envname x e state =
       tau = typeIn getenv envname x state in
       E.bind x (e, tau) env'
 
-bindInRho :: Name -> X.Expr -> SymbolicState -> E.Env (X.Expr, X.Type)
+bindInRho :: Name -> X.Expr -> SymbolicState -> E.Env (X.Expr, T.Type)
 bindInRho = bindIn rho "rho"
 
-bindInMu :: Name -> X.Expr -> SymbolicState -> E.Env (X.Expr, X.Type)
+bindInMu :: Name -> X.Expr -> SymbolicState -> E.Env (X.Expr, T.Type)
 bindInMu = bindIn mu "mu"
 
-bindNew :: (SymbolicState -> VarEnv) -> Name -> (Name -> (X.Expr, X.Type) -> SymbolicState -> E.Env (X.Expr, X.Type))
+bindNew :: (SymbolicState -> VarEnv) -> Name -> (Name -> (X.Expr, T.Type) -> SymbolicState -> E.Env (X.Expr, T.Type))
 bindNew getenv envname x y state =
   let env' = getenv state in
     if env' `E.binds` x then throw (AlreadyBound x envname)
     else E.bind x y env'
 
-bindNewRho :: Name -> (X.Expr, X.Type) -> SymbolicState -> E.Env (X.Expr, X.Type)
+bindNewRho :: Name -> (X.Expr, T.Type) -> SymbolicState -> E.Env (X.Expr, T.Type)
 bindNewRho = bindNew rho "rho"
 
-bindNewMu :: Name -> (X.Expr, X.Type) -> SymbolicState -> E.Env (X.Expr, X.Type)
+bindNewMu :: Name -> (X.Expr, T.Type) -> SymbolicState -> E.Env (X.Expr, T.Type)
 bindNewMu = bindNew mu "mu"
 
 -- symbolic state: {g, rho, mu}
@@ -109,7 +109,7 @@ sequence exec (s1, as) =
 function :: SymbolicExecutor U.Function
 function (state, U.Function returnty _ params body) =
   let
-    state' = foldr (\(n, t) state_i -> state_i {rho = bindNewRho n (X.Free n, X.Integral t) state_i}) state params
+    state' = foldr (\(n, t) state_i -> state_i {rho = bindNewRho n (X.Free n, T.Integral t) state_i}) state params
   in
     do
       (state'', s) <- stmt (state', body)
@@ -128,18 +128,18 @@ stmt (state, c) = case c of
     r2 <- stmt (state_2, c2)
     [r1, r2]
   U.DeclareStack b x ->
-    return (state { rho = bindNewRho x (zero, X.Integral b) state}, zero)
+    return (state { rho = bindNewRho x (zero, T.Integral b) state}, zero)
   U.DeclareStackObj t x a ->
     let
-      tau = X.Complex t
-      state' = state { rho = bindNewRho a (X.NewArr (X.dim tau) (X.base tau), tau) state }
-      state'' = state' { rho = bindNewRho x (X.PtrTo a, X.Integral (X.Ptr tau)) state' }
+      tau = T.Complex t
+      state' = state { rho = bindNewRho a (X.NewArr (T.dim tau) (T.base tau), tau) state }
+      state'' = state' { rho = bindNewRho x (X.PtrTo a, T.Integral (T.Ptr tau)) state' }
     in return (state'', zero)
   U.DeclareHeapObj t x a ->
     let
-      tau = X.Complex t
-      state' = state { mu = bindNewMu a (X.NewArr (X.dim tau) (X.base tau), tau) state }
-      state'' = state' { rho = bindNewRho x (X.PtrTo a, X.Integral (X.Ptr tau)) state' }
+      tau = T.Complex t
+      state' = state { mu = bindNewMu a (X.NewArr (T.dim tau) (T.base tau), tau) state }
+      state'' = state' { rho = bindNewRho x (X.PtrTo a, T.Integral (T.Ptr tau)) state' }
     in return (state'', zero)
   U.Return e -> exp (state, e)
   _ -> throw (Unsupported "loops")
@@ -218,11 +218,11 @@ exp (state, e) = case e of
     case toOffset s of
       X.BinExpr (X.PtrTo a) AST.Add s_1 -> do
         let (getenv, envname) = if rho state' `E.binds` a then (rho, "rho") else (mu, "mu")
-        let t = X.base (typeIn getenv envname a state')
+        let t = T.base (typeIn getenv envname a state')
         return (state', X.FromType t (X.Sel (valIn getenv envname a state') [s_1]))
       _ -> throw UnknownAlias
   U.Var x -> case typeInRho x state of
-      X.Integral t -> return (state, X.FromType t (valInRho x state))
+      T.Integral t -> return (state, X.FromType t (valInRho x state))
       _ -> throw (Unsupported "memory objects referenced directly")
   U.Index x es ->
     let ptr = valInRho x state in
@@ -230,7 +230,7 @@ exp (state, e) = case e of
       X.PtrTo addr ->  do
         let (getenv, envname) = if rho state `E.binds` addr then (rho, "rho") else (mu, "mu")
         (state_n1, is) <- many state exp es
-        let t = X.base (typeIn getenv envname addr state_n1)
+        let t = T.base (typeIn getenv envname addr state_n1)
         return (state, X.FromType t (X.Sel (valIn getenv envname addr state_n1) is))
       _ -> throw (NotPointer x)
   U.Int i -> return (state, X.Literal i)

@@ -2,10 +2,11 @@ module UnambiguousAST where
 
 import qualified SymbolicExpression as X
 import qualified AST
+import qualified Types as T
 
 type Name = String
 
-data Function = Function X.Integral Name [(Name, X.Integral)] Stmt
+data Function = Function T.Integral Name [(Name, T.Integral)] Stmt
 
 data Expr = BinExpr Expr AST.BinOp Expr
           | LogExpr Expr AST.LogOp Expr
@@ -23,9 +24,9 @@ data Expr = BinExpr Expr AST.BinOp Expr
 data Stmt = CompoundStmt [Stmt]
           | Expr Expr
           | IfElse Expr Stmt Stmt
-          | DeclareHeapObj X.Complex Name Name
-          | DeclareStack X.Integral Name
-          | DeclareStackObj X.Complex Name Name
+          | DeclareHeapObj T.Complex Name Name
+          | DeclareStack T.Integral Name
+          | DeclareStackObj T.Complex Name Name
           | While Expr [Stmt]
           | For Stmt Expr Stmt [Stmt]
           | Return Expr

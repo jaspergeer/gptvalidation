@@ -9,6 +9,7 @@ import Data.SBV ( (.<=>), runSMT )
 import TestUtils (assertProvable, assertNotProvable)
 import Test.HUnit (Assertion, Test (TestList, TestCase, TestLabel))
 import PassManager (sbvOfFunction)
+import qualified Types as T
 
 tests :: Test
 tests = TestLabel "simple"
@@ -26,13 +27,13 @@ tests = TestLabel "simple"
 
 mulx2 :: Function
 mulx2 =
-  Function X.Int32 "f" [("x", X.Int32)]
+  Function T.Int32 "f" [("x", T.Int32)]
     (CompoundStmt
       [ Return (BinExpr (Var "x") AST.Mul (Int 2)) ])
       
 addxx :: Function
 addxx =
-  Function X.Int32 "f" [("x", X.Int32)]
+  Function T.Int32 "f" [("x", T.Int32)]
     (CompoundStmt
       [ Return (BinExpr (Var "x") AST.Add (Var "x")) ])
 
@@ -47,13 +48,13 @@ test1 = do
 
 subxy :: Function
 subxy =
-  Function X.Int32 "f" [("x", X.Int32), ("y", X.Int32)]
+  Function T.Int32 "f" [("x", T.Int32), ("y", T.Int32)]
     (CompoundStmt
       [ Return (BinExpr (Var "x") AST.Sub (Var "y")) ])
       
 subyx :: Function
 subyx =
-  Function X.Int32 "f" [("x", X.Int32), ("y", X.Int32)]
+  Function T.Int32 "f" [("x", T.Int32), ("y", T.Int32)]
     (CompoundStmt
       [ Return (BinExpr (Var "y") AST.Sub (Var "x")) ])
 
@@ -68,12 +69,12 @@ test2 = do
 
 bool1 :: Function
 bool1 =
-  Function X.Int8 "f" [("a", X.Int8), ("b", X.Int8)]
+  Function T.Int8 "f" [("a", T.Int8), ("b", T.Int8)]
     (Return (UnExpr AST.LNot (LogExpr (Var "a") AST.LAnd (Var "b"))))
 
 bool2 :: Function
 bool2 =
-  Function X.Int8 "f" [("a", X.Int8), ("b", X.Int8)]
+  Function T.Int8 "f" [("a", T.Int8), ("b", T.Int8)]
     (Return (LogExpr (UnExpr AST.LNot (Var "a")) AST.LOr (UnExpr AST.LNot (Var "b")) ))
 
 test3 :: Assertion
@@ -87,18 +88,18 @@ test3 = do
 
 arr1 :: Function
 arr1 =
-  Function X.Int32 "f" [("i", X.Int32)]
+  Function T.Int32 "f" [("i", T.Int32)]
     (CompoundStmt
-      [ DeclareHeapObj (X.Arr 1 X.Int32) "arr" "arr_obj"
+      [ DeclareHeapObj (T.Arr 1 T.Int32) "arr" "arr_obj"
       , Expr (Assign (Var "i") (BinExpr (Var "i") AST.Add (Var "i")))
       , Expr (Assign (Index "arr" [Var "i"]) (Int 1))
       , Return (Index "arr" [Var "i"]) ])
 
 arr2 :: Function
 arr2 =
-  Function X.Int32 "f" [("i", X.Int32)]
+  Function T.Int32 "f" [("i", T.Int32)]
     (CompoundStmt
-      [ DeclareHeapObj (X.Arr 1 X.Int32) "arr" "arr_obj"
+      [ DeclareHeapObj (T.Arr 1 T.Int32) "arr" "arr_obj"
       , Expr (Assign (Var "i") (BinExpr (Var "i") AST.Mul (Int 2)))
       , Expr (Assign (Index "arr" [Var "i"]) (Int 1))
       , Return (Index "arr" [Var "i"]) ])
@@ -114,18 +115,18 @@ test4 = do
 
 arr3 :: Function
 arr3 =
-  Function X.Int32 "f" [("i", X.Int32)]
+  Function T.Int32 "f" [("i", T.Int32)]
     (CompoundStmt
-      [ DeclareStackObj (X.Arr 1 X.Int32) "arr" "arr_obj"
+      [ DeclareStackObj (T.Arr 1 T.Int32) "arr" "arr_obj"
       , Expr (Assign (Var "i") (BinExpr (Var "i") AST.Add (Var "i")))
       , Expr (Assign (Index "arr" [Var "i"]) (Int 1))
       , Return (Index "arr" [Var "i"]) ])
 
 arr4 :: Function
 arr4 =
-  Function X.Int32 "f" [("i", X.Int32)]
+  Function T.Int32 "f" [("i", T.Int32)]
     (CompoundStmt
-      [ DeclareStackObj (X.Arr 1 X.Int32) "arr" "arr_obj"
+      [ DeclareStackObj (T.Arr 1 T.Int32) "arr" "arr_obj"
       , Expr (Assign (Var "i") (BinExpr (Var "i") AST.Mul (Int 2)))
       , Expr (Assign (Index "arr" [Var "i"]) (Int 1))
       , Return (Index "arr" [Var "i"]) ])
@@ -141,7 +142,7 @@ test5 = do
 
 ifdemo1 :: Function
 ifdemo1 =
-  Function X.Int32 "f" [("x", X.Int32)]
+  Function T.Int32 "f" [("x", T.Int32)]
     (CompoundStmt
       [ IfElse (RelExpr (Var "x") AST.Eq (Int 0))
           (Return (Int 0))
@@ -150,7 +151,7 @@ ifdemo1 =
 
 square :: Function
 square =
-  Function X.Int32 "f" [("x", X.Int32)]
+  Function T.Int32 "f" [("x", T.Int32)]
     (Return (BinExpr (Var "x") AST.Mul (Var "x")))
 
 test6 :: Assertion
@@ -164,7 +165,7 @@ test6 = do
 
 ifdemo2 :: Function
 ifdemo2 =
-  Function X.Int32 "f" [("x", X.Int32)]
+  Function T.Int32 "f" [("x", T.Int32)]
     (CompoundStmt
       [ IfElse (RelExpr (Var "x") AST.Eq (Int 0))
           (Return (Int 1))
@@ -182,9 +183,9 @@ test7 = do
 
 func1 :: Function
 func1 =
-  Function X.Int32 "f" [("a", X.Int32), ("b", X.Int32)]
+  Function T.Int32 "f" [("a", T.Int32), ("b", T.Int32)]
     (CompoundStmt
-      [ DeclareStack X.Int32 "sum"
+      [ DeclareStack T.Int32 "sum"
       , Expr (Assign (Var "sum") (BinExpr (Var "a") AST.Add (Var "b")))
       , IfElse (RelExpr (Var "sum") AST.Eq (Int 6))
           (Return (Int 3))
@@ -193,9 +194,9 @@ func1 =
 
 func2 :: Function
 func2 =
-  Function X.Int32 "f" [("a", X.Int32), ("b", X.Int32)]
+  Function T.Int32 "f" [("a", T.Int32), ("b", T.Int32)]
     (CompoundStmt
-      [ DeclareStack X.Int32 "sum"
+      [ DeclareStack T.Int32 "sum"
       , Expr (Assign (Var "sum") (BinExpr (Var "a") AST.Add (Var "b")))
       , IfElse (RelExpr (Var "sum") AST.Eq (Int 6))
           (Return (Int 3))
