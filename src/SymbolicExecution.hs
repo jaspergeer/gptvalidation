@@ -153,9 +153,8 @@ stmt (state, c) = case c of
       state' = state { rho = bindNewRho a (X.NewArr (T.dim tau) (T.base tau), tau) state }
       state'' = state' { rho = bindNewRho x (X.PtrTo a, T.Integral (T.Ptr tau)) state' }
     in return (state'', zero)
-  U.DeclareHeapObj t x ->
+  U.DeclareHeapObj t x a ->
     let
-      a = x ++ "_arr"
       tau = T.Complex t
       state' = state { mu = bindNewMu a (X.NewArr (T.dim tau) (T.base tau), tau) state }
       state'' = state' { rho = bindNewRho x (X.PtrTo a, T.Integral (T.Ptr tau)) state' }

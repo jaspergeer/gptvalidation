@@ -92,7 +92,7 @@ arr1 :: Function
 arr1 =
   Function  Int32 "f" [("i", int32)]
     (CompoundStmt
-      [ DeclareHeapObj (Arr 1  Int32) "arr"
+      [ DeclareHeapObj (Arr 1  Int32) "arr" "arr_obj"
       , Expr (Assign (Var "i") (BinExpr (Var "i") AST.Add (Var "i")))
       , Expr (Assign (Index "arr" [Var "i"]) (Int 1))
       , Return (Index "arr" [Var "i"]) ])
@@ -101,7 +101,7 @@ arr2 :: Function
 arr2 =
   Function  Int32 "f" [("i", int32)]
     (CompoundStmt
-      [ DeclareHeapObj (Arr 1  Int32) "arr"
+      [ DeclareHeapObj (Arr 1  Int32) "arr" "arr_obj"
       , Expr (Assign (Var "i") (BinExpr (Var "i") AST.Mul (Int 2)))
       , Expr (Assign (Index "arr" [Var "i"]) (Int 1))
       , Return (Index "arr" [Var "i"]) ])

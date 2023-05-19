@@ -24,7 +24,7 @@ data Expr = BinExpr Expr AST.BinOp Expr
 data Stmt = CompoundStmt [Stmt]
           | Expr Expr
           | IfElse Expr Stmt Stmt
-          | DeclareHeapObj T.Complex Name
+          | DeclareHeapObj T.Complex Name Name
           | DeclareStack T.Integral Name
           | DeclareStackObj T.Complex Name
           | While Expr [Stmt]
