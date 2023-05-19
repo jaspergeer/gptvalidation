@@ -81,6 +81,7 @@ executable tinyvalidator
                       sbv,
                       containers,
                       transformers,
+                      language-c,
                       HUnit
 
     -- Directories containing source files.
@@ -97,6 +98,7 @@ test-suite tinyvalidator-testsuite
                       sbv,
                       containers,
                       transformers,
+                      language-c,
                       HUnit
 
     other-extensions: FlexibleContexts

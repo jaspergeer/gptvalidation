@@ -6,7 +6,7 @@ import qualified Types as T
 
 type Name = String
 
-data Function = Function T.Integral Name [(Name, T.Integral)] Stmt
+data Function = Function T.Integral Name [(Name, T.Type)] Stmt
 
 data Expr = BinExpr Expr AST.BinOp Expr
           | LogExpr Expr AST.LogOp Expr
@@ -24,9 +24,9 @@ data Expr = BinExpr Expr AST.BinOp Expr
 data Stmt = CompoundStmt [Stmt]
           | Expr Expr
           | IfElse Expr Stmt Stmt
-          | DeclareHeapObj T.Complex Name Name
+          | DeclareHeapObj T.Complex Name
           | DeclareStack T.Integral Name
-          | DeclareStackObj T.Complex Name Name
+          | DeclareStackObj T.Complex Name
           | While Expr [Stmt]
           | For Stmt Expr Stmt [Stmt]
           | Return Expr

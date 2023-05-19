@@ -91,7 +91,7 @@ bindNewMu :: Name -> (X.Expr, T.Type) -> SymbolicState -> E.Env (X.Expr, T.Type)
 bindNewMu = bindNew mu "mu"
 
 -- symbolic state: {g, rho, mu}
-data SymbolicState = SymbolicState { g :: [X.Expr], rho :: VarEnv, mu :: VarEnv }
+data SymbolicState = SymbolicState { g :: [X.Expr], rho :: VarEnv, mu :: VarEnv } deriving Show
 
 initState :: SymbolicState
 initState = SymbolicState { g = [], rho = E.empty, mu = E.empty }
@@ -109,7 +109,24 @@ sequence exec (s1, as) =
 function :: SymbolicExecutor U.Function
 function (state, U.Function returnty _ params body) =
   let
-    state' = foldr (\(n, t) state_i -> state_i {rho = bindNewRho n (X.Free n, T.Integral t) state_i}) state params
+    state' = foldr (\(n, tau) state_i -> 
+      case tau of
+        T.Complex (T.Arr _ _) ->
+          let
+            arrName = n ++ "_obj"
+            state_i' = state_i { rho = bindNewRho n (X.PtrTo arrName, T.Integral (T.Ptr tau)) state_i }
+          in
+            state_i' { rho = bindNewRho arrName (X.Free arrName, tau) state_i' }
+        T.Integral (T.Ptr _) ->
+          let
+            arrTy = T.Complex (T.Arr (T.dim tau) (T.base tau))
+            arrName = n ++ "_obj"
+            state_i' = state_i { rho = bindNewRho n (X.PtrTo arrName, T.Integral (T.Ptr arrTy)) state_i }
+          in
+            state_i' { mu = bindNewMu arrName (X.Free arrName, arrTy) state_i' }
+        T.Integral _ ->
+          state_i { rho = bindNewRho n (X.Free n, tau) state_i }
+          ) state params
   in
     do
       (state'', s) <- stmt (state', body)
@@ -129,14 +146,16 @@ stmt (state, c) = case c of
     [r1, r2]
   U.DeclareStack b x ->
     return (state { rho = bindNewRho x (zero, T.Integral b) state}, zero)
-  U.DeclareStackObj t x a ->
+  U.DeclareStackObj t x ->
     let
+      a = x ++ "_arr"
       tau = T.Complex t
       state' = state { rho = bindNewRho a (X.NewArr (T.dim tau) (T.base tau), tau) state }
       state'' = state' { rho = bindNewRho x (X.PtrTo a, T.Integral (T.Ptr tau)) state' }
     in return (state'', zero)
-  U.DeclareHeapObj t x a ->
+  U.DeclareHeapObj t x ->
     let
+      a = x ++ "_arr"
       tau = T.Complex t
       state' = state { mu = bindNewMu a (X.NewArr (T.dim tau) (T.base tau), tau) state }
       state'' = state' { rho = bindNewRho x (X.PtrTo a, T.Integral (T.Ptr tau)) state' }

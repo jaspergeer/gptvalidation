@@ -9,7 +9,7 @@ data ShiftOp = Shl | Shr deriving Show
 
 data Unop = Neg | LNot | BNot deriving Show
 
-data Function = Function T.Integral Name [(Name, T.Integral)] Stmt
+data Function = Function T.Integral Name [(Name, T.Type)] Stmt deriving Show
 
 data Expr = BinExpr Expr BinOp Expr
           | LogExpr Expr LogOp Expr

@@ -3,13 +3,13 @@
 module Simple where
 
 import qualified AST
-import qualified SymbolicExpression as X
 import UnambiguousAST
 import Data.SBV ( (.<=>), runSMT )
-import TestUtils (assertProvable, assertNotProvable)
+import TestUtils
 import Test.HUnit (Assertion, Test (TestList, TestCase, TestLabel))
 import PassManager (sbvOfFunction)
-import qualified Types as T
+import Types
+import SymbolicExecution (execute)
 
 tests :: Test
 tests = TestLabel "simple"
@@ -20,20 +20,22 @@ tests = TestLabel "simple"
                                     , test5
                                     , test6
                                     , test7
-                                    , test8 ])
+                                    , test8
+                                    {-, test9 -}
+                                    ])
 
 -- Test 1
 -- Trivially equivalent programs
 
 mulx2 :: Function
 mulx2 =
-  Function T.Int32 "f" [("x", T.Int32)]
+  Function  Int32 "f" [("x", int32)]
     (CompoundStmt
       [ Return (BinExpr (Var "x") AST.Mul (Int 2)) ])
       
 addxx :: Function
 addxx =
-  Function T.Int32 "f" [("x", T.Int32)]
+  Function  Int32 "f" [("x", int32)]
     (CompoundStmt
       [ Return (BinExpr (Var "x") AST.Add (Var "x")) ])
 
@@ -48,13 +50,13 @@ test1 = do
 
 subxy :: Function
 subxy =
-  Function T.Int32 "f" [("x", T.Int32), ("y", T.Int32)]
+  Function  Int32 "f" [("x", int32), ("y", int32)]
     (CompoundStmt
       [ Return (BinExpr (Var "x") AST.Sub (Var "y")) ])
       
 subyx :: Function
 subyx =
-  Function T.Int32 "f" [("x", T.Int32), ("y", T.Int32)]
+  Function  Int32 "f" [("x", int32), ("y", int32)]
     (CompoundStmt
       [ Return (BinExpr (Var "y") AST.Sub (Var "x")) ])
 
@@ -69,12 +71,12 @@ test2 = do
 
 bool1 :: Function
 bool1 =
-  Function T.Int8 "f" [("a", T.Int8), ("b", T.Int8)]
+  Function  Int8 "f" [("a", int8), ("b", int8)]
     (Return (UnExpr AST.LNot (LogExpr (Var "a") AST.LAnd (Var "b"))))
 
 bool2 :: Function
 bool2 =
-  Function T.Int8 "f" [("a", T.Int8), ("b", T.Int8)]
+  Function  Int8 "f" [("a", int8), ("b", int8)]
     (Return (LogExpr (UnExpr AST.LNot (Var "a")) AST.LOr (UnExpr AST.LNot (Var "b")) ))
 
 test3 :: Assertion
@@ -88,18 +90,18 @@ test3 = do
 
 arr1 :: Function
 arr1 =
-  Function T.Int32 "f" [("i", T.Int32)]
+  Function  Int32 "f" [("i", int32)]
     (CompoundStmt
-      [ DeclareHeapObj (T.Arr 1 T.Int32) "arr" "arr_obj"
+      [ DeclareHeapObj (Arr 1  Int32) "arr"
       , Expr (Assign (Var "i") (BinExpr (Var "i") AST.Add (Var "i")))
       , Expr (Assign (Index "arr" [Var "i"]) (Int 1))
       , Return (Index "arr" [Var "i"]) ])
 
 arr2 :: Function
 arr2 =
-  Function T.Int32 "f" [("i", T.Int32)]
+  Function  Int32 "f" [("i", int32)]
     (CompoundStmt
-      [ DeclareHeapObj (T.Arr 1 T.Int32) "arr" "arr_obj"
+      [ DeclareHeapObj (Arr 1  Int32) "arr"
       , Expr (Assign (Var "i") (BinExpr (Var "i") AST.Mul (Int 2)))
       , Expr (Assign (Index "arr" [Var "i"]) (Int 1))
       , Return (Index "arr" [Var "i"]) ])
@@ -115,18 +117,18 @@ test4 = do
 
 arr3 :: Function
 arr3 =
-  Function T.Int32 "f" [("i", T.Int32)]
+  Function  Int32 "f" [("i", int32)]
     (CompoundStmt
-      [ DeclareStackObj (T.Arr 1 T.Int32) "arr" "arr_obj"
+      [ DeclareStackObj (Arr 1  Int32) "arr"
       , Expr (Assign (Var "i") (BinExpr (Var "i") AST.Add (Var "i")))
       , Expr (Assign (Index "arr" [Var "i"]) (Int 1))
       , Return (Index "arr" [Var "i"]) ])
 
 arr4 :: Function
 arr4 =
-  Function T.Int32 "f" [("i", T.Int32)]
+  Function  Int32 "f" [("i", int32)]
     (CompoundStmt
-      [ DeclareStackObj (T.Arr 1 T.Int32) "arr" "arr_obj"
+      [ DeclareStackObj (Arr 1  Int32) "arr"
       , Expr (Assign (Var "i") (BinExpr (Var "i") AST.Mul (Int 2)))
       , Expr (Assign (Index "arr" [Var "i"]) (Int 1))
       , Return (Index "arr" [Var "i"]) ])
@@ -142,7 +144,7 @@ test5 = do
 
 ifdemo1 :: Function
 ifdemo1 =
-  Function T.Int32 "f" [("x", T.Int32)]
+  Function  Int32 "f" [("x", int32)]
     (CompoundStmt
       [ IfElse (RelExpr (Var "x") AST.Eq (Int 0))
           (Return (Int 0))
@@ -151,7 +153,7 @@ ifdemo1 =
 
 square :: Function
 square =
-  Function T.Int32 "f" [("x", T.Int32)]
+  Function  Int32 "f" [("x", int32)]
     (Return (BinExpr (Var "x") AST.Mul (Var "x")))
 
 test6 :: Assertion
@@ -160,12 +162,12 @@ test6 = do
     sbv2 <- runSMT (sbvOfFunction square)
     assertProvable (sbv1 .<=> sbv2)
 
--- Test 6
+-- Test 7
 -- Control flow, not equivalent
 
 ifdemo2 :: Function
 ifdemo2 =
-  Function T.Int32 "f" [("x", T.Int32)]
+  Function  Int32 "f" [("x", int32)]
     (CompoundStmt
       [ IfElse (RelExpr (Var "x") AST.Eq (Int 0))
           (Return (Int 1))
@@ -178,14 +180,14 @@ test7 = do
     sbv2 <- runSMT (sbvOfFunction ifdemo2)
     assertNotProvable (sbv1 .<=> sbv2)
 
--- Test 7
+-- Test 8
 -- Simple "improvement" suggested by ChatGPT
 
 func1 :: Function
 func1 =
-  Function T.Int32 "f" [("a", T.Int32), ("b", T.Int32)]
+  Function  Int32 "f" [("a", int32), ("b", int32)]
     (CompoundStmt
-      [ DeclareStack T.Int32 "sum"
+      [ DeclareStack  Int32 "sum"
       , Expr (Assign (Var "sum") (BinExpr (Var "a") AST.Add (Var "b")))
       , IfElse (RelExpr (Var "sum") AST.Eq (Int 6))
           (Return (Int 3))
@@ -194,9 +196,9 @@ func1 =
 
 func2 :: Function
 func2 =
-  Function T.Int32 "f" [("a", T.Int32), ("b", T.Int32)]
+  Function  Int32 "f" [("a", int32), ("b", int32)]
     (CompoundStmt
-      [ DeclareStack T.Int32 "sum"
+      [ DeclareStack  Int32 "sum"
       , Expr (Assign (Var "sum") (BinExpr (Var "a") AST.Add (Var "b")))
       , IfElse (RelExpr (Var "sum") AST.Eq (Int 6))
           (Return (Int 3))
@@ -207,4 +209,31 @@ test8 :: Assertion
 test8 = do
     sbv1 <- runSMT (sbvOfFunction func1)
     sbv2 <- runSMT (sbvOfFunction func2)
+    assertProvable (sbv1 .<=> sbv2)
+
+-- Test 9
+-- pointer to array as argument
+-- DOES NOT WORK (SBV issue?)
+
+arrptrparam1 :: Function
+arrptrparam1 =
+  Function  Int32 "f" [("i", int32), ("arr", arr 1 Int32)]
+    (CompoundStmt
+      [ Expr (Assign (Var "i") (BinExpr (Var "i") AST.Add (Var "i")))
+      , Expr (Assign (Index "arr" [Var "i"]) (Int 1))
+      , Return (Index "arr" [Var "i"]) ])
+
+arrptrparam2 :: Function
+arrptrparam2 =
+  Function  Int32 "f" [("i", int32), ("arr", arr 1 Int32)]
+    (CompoundStmt
+      [ Expr (Assign (Var "i") (BinExpr (Var "i") AST.Mul (Int 3)))
+      , Expr (Assign (Index "arr" [Var "i"]) (Int 1))
+      , Return (Index "arr" [Var "i"]) ])
+
+test9 :: Assertion
+test9 = do
+    print (execute arrptrparam1)
+    sbv1 <- runSMT (sbvOfFunction arrptrparam1)
+    sbv2 <- runSMT (sbvOfFunction arrptrparam2)
     assertProvable (sbv1 .<=> sbv2)

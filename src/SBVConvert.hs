@@ -25,7 +25,8 @@ import Data.SBV
       SInt32,
       SInt8,
       SWord32,
-      SymArray(readArray, writeArray),
+      readArray,
+      writeArray,
       SymVal,
       HasKind,
       OrdSymbolic((.>), (.<=), (.>=), (.<)),
@@ -33,7 +34,7 @@ import Data.SBV
       SFiniteBits,
       SIntegral,
       SMTDefinable(sym, uninterpret),
-      Symbolic, sShiftRight, (.^.) )
+      Symbolic, sShiftRight, (.^.), lambdaAsArray, Forall (Forall), constrain, newArray, free )
 import Data.SBV.Tuple ( tuple )
 import Data.Map (toList)
 import Control.Exception ( Exception, throw )
@@ -46,7 +47,7 @@ instance Show SBVConvertException where
 instance Exception SBVConvertException
 
 -- Array helpers
-toArrN :: (SFiniteBits a, SDivisible (SBV a), SIntegral a, SymVal a, HasKind tup) => ([SBV Int32] -> SBV tup) -> X.Expr -> Symbolic (SArray tup a)
+toArrN :: (SFiniteBits a, SDivisible (SBV a), SIntegral a, SymVal a, SymVal tup, HasKind tup) => ([SBV Int32] -> SBV tup) -> X.Expr -> Symbolic (SArray tup a)
 toArrN tupleN e = case e of
   X.NewArr {} -> newArray_ Nothing
   X.Upd e1 es e2 -> do
@@ -54,6 +55,7 @@ toArrN tupleN e = case e of
     is <- tupleN <$> mapM convertExp es
     val <- convertExp e2
     return $ writeArray arr is val
+  X.Free n -> return $ lambdaAsArray (sym ("init_" ++ n))
   _ -> error "IMPOSSIBLE: non-array value encountered as array"
 
 tuple1 :: [SBV a] -> SBV a
