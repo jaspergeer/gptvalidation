@@ -134,7 +134,9 @@ function (state, U.Function returnty _ params body) =
 
 stmt :: SymbolicExecutor U.Stmt
 stmt (state, c) = case c of
-  U.CompoundStmt cs -> sequence stmt (state, cs)
+  U.CompoundStmt cs -> do
+    (state', c') <- sequence stmt (state, cs)
+    pure (state' { rho = E.restrict (rho state') (rho state) }, c')
   U.Expr e -> (\(s', _) -> (s', zero)) <$> exp (state, e)
   U.IfElse e c1 c2 -> do
     (state', g1) <- exp (state, e)

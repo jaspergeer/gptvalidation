@@ -206,7 +206,7 @@ $\mu$ - mapping of names to heap memory\\
 \begin{mathpar}
   \inferrule*[Right=\textsc{CompoundStatement}]
   {\forall i\in\{1..n\}.\langle S_k;c_i \rangle\Yields\langle S_{i+1};s_{i+1} \rangle}
-  {\langle S_1; \texttt{\{$c_1..c_n$\}}\rangle\Yields\langle S_{n+1}[\rho\mapsto\rho(S_1)];s_{n+1} \rangle}
+  {\langle S_1; \texttt{\{$c_1..c_n$\}}\rangle\Yields\langle S_{n+1}[\rho\mapsto\rho(S_{n+1})|_{\Dom\rho(S_1)}];s_{n+1} \rangle}
 \end{mathpar}
 
 % fork execution instead of defer?

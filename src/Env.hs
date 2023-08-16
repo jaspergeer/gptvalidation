@@ -17,3 +17,6 @@ binds env n = M.member n env
 
 empty :: Env a
 empty = M.empty
+
+restrict :: Env a -> Env a -> Env a
+restrict = M.intersection
