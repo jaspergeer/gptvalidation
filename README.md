@@ -1,2 +1,2 @@
 # tinyvalidator
-C-subset symbolic executor for small research project. WIP
+Symbolic executor and C-style embedded DSL
