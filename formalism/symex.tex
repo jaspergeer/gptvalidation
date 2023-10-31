@@ -278,7 +278,7 @@ $\mu$ - mapping of names to heap memory\\
   {\rho(S_1)[x]=\Ptr\alpha\\
   \rho(S_1)[\alpha]=s\\
   \forall i\in\{1..n\}.\langle S_i; e_i \rangle\Yields\langle S_{i+1};s_i \rangle}
-  {\langle S_1; \texttt{\texttt{$x$[$e_1$]..[$e_n$]}}\rangle\Yields\langle S_{i+1};Sel(s,(s_1,..,s_n)) \rangle}
+  {\langle S_1; \texttt{\texttt{$x$[$e_1$]..[$e_n$]}}\rangle\Yields\langle S_{i+1};\Sel(s,(s_1,..,s_n)) \rangle}
 \end{mathpar}
 
 \begin{mathpar}
@@ -286,7 +286,7 @@ $\mu$ - mapping of names to heap memory\\
   {\rho(S_1)[x]=\Ptr\alpha\\
   \mu(S_1)[\alpha]=s\\
   \forall i\in\{1..n\}.\langle S_i; e_i \rangle\Yields\langle S_{i+1};s_i \rangle}
-  {\langle S_1; \texttt{\texttt{$x$[$e_1$]..[$e_n$]}}\rangle\Yields\langle S_{i+1};Sel(s,(s_1,..,s_n)) \rangle}
+  {\langle S_1; \texttt{\texttt{$x$[$e_1$]..[$e_n$]}}\rangle\Yields\langle S_{i+1};\Sel(s,(s_1,..,s_n)) \rangle}
 \end{mathpar}
 
 

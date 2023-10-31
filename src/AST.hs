@@ -24,6 +24,7 @@ data Expr = BinExpr Expr BinOp Expr
           | Char Char
           | Index Name [Expr]
           | Deref Expr
+          | Alloc T.Integral Int
           deriving Show
 
 type Name = String

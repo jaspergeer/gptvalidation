@@ -62,15 +62,17 @@ executable tinyvalidator
 
     -- Modules included in this executable, other than Main.
     other-modules:
-      AST,
-      UnambiguousAST,
-      Disambiguate,
-      Env,
-      SymbolicExecution,
-      SymbolicExpression,
-      Env,
-      List,
-      SBVConvert
+       AST,
+       Env,
+       NormalizedAST,
+       PassManager,
+       SBVConvert,
+       SymbolicExecution,
+       SymbolicExpression,
+       Types
+
+    default-extensions:
+      LambdaCase
 
     -- LANGUAGE extensions used by modules in this package.
     other-extensions: FlexibleContexts
@@ -93,7 +95,7 @@ executable tinyvalidator
 test-suite tinyvalidator-testsuite
     type: exitcode-stdio-1.0
     main-is: TestSuite.hs
-    build-depends:    base ^>=4.17.0.0,
+    build-depends:    base, 
                       parsec,
                       sbv,
                       containers,

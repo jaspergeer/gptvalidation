@@ -1,6 +1,5 @@
-module UnambiguousAST where
+module NormalizedAST where
 
-import qualified SymbolicExpression as X
 import qualified AST
 import qualified Types as T
 
@@ -20,10 +19,12 @@ data Expr = BinExpr Expr AST.BinOp Expr
           | Int Integer
           | Char Char
           | Deref Expr
+          | Alloc T.Integral Int Name
 
 data Stmt = CompoundStmt [Stmt]
           | Expr Expr
           | IfElse Expr Stmt Stmt
+          | Declare T.Integral Name
           | DeclareHeapObj T.Complex Name Name
           | DeclareStack T.Integral Name
           | DeclareStackObj T.Complex Name

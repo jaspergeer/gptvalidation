@@ -1,6 +1,6 @@
 module Env where
 
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
  
 type Name = String
 
